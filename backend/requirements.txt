@@ -1,0 +1,17 @@
+# FastAPI 核心套件
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# CORS 支援（讓前端可以呼叫 API）
+python-multipart==0.0.20
+
+# 資料驗證
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# 資料庫
+aiosqlite==0.20.0
+
+# PDF 處理（如果需要的話）
+# paddlepaddle
+# paddleocr

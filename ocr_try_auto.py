@@ -3,7 +3,6 @@ import numpy as np
 from paddleocr import PaddleOCR
 from pdf2image import convert_from_path
 
-
 def ocr_pdf(pdf_path: str):
     """
     將 PDF 的每一頁分別進行 OCR
