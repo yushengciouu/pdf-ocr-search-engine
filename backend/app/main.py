@@ -4,7 +4,7 @@ FUYU 文件搜尋系統的後端 API
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api import documents, search
+from .api import documents, search, ocr
 
 # 建立 FastAPI 應用程式
 app = FastAPI(
@@ -25,6 +25,7 @@ app.add_middleware(
 # 註冊路由
 app.include_router(documents.router)
 app.include_router(search.router)
+app.include_router(ocr.router)
 
 
 @app.get("/")
