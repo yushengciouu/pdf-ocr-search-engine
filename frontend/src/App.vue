@@ -58,6 +58,21 @@
           </div>
         </div>
 
+        <!-- OCR 處理中提示 -->
+        <div v-if="scanning" class="ocr-processing-overlay">
+          <div class="ocr-processing-content">
+            <div class="ocr-spinner">
+              <svg class="loading" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+            <h3>正在處理 PDF 檔案...</h3>
+            <p>系統正在使用 OCR 技術辨識文件內容</p>
+            <p class="ocr-hint">這可能需要幾秒到幾分鐘，請耐心等候</p>
+          </div>
+        </div>
+
         <!-- 載入狀態 -->
         <div v-if="loading" class="loading-container">
           <div class="loading-spinner-large">
@@ -124,7 +139,10 @@
 import SearchBar from './components/SearchBar.vue'
 import DocumentItem from './components/DocumentItem.vue'
 
-const API_BASE_URL = 'http://localhost:8000'
+// API 位址 - 自動偵測（localhost 和外網都能用）
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:8000'  // 本機使用
+  : 'http://100.83.146.90:8000'  // 外網使用
 
 export default {
   name: 'App',
@@ -464,6 +482,83 @@ export default {
 .empty-state h3 {
   font-size: 1.25rem;
   color: var(--color-text-secondary);
+}
+
+/* OCR 處理中提示 */
+.ocr-processing-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn var(--transition-normal);
+}
+
+.ocr-processing-content {
+  text-align: center;
+  padding: var(--spacing-2xl);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-xl);
+  max-width: 400px;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ocr-spinner {
+  margin: 0 auto var(--spacing-lg);
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ocr-spinner svg {
+  width: 100%;
+  height: 100%;
+  color: var(--color-primary);
+}
+
+.ocr-processing-content h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-md);
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ocr-processing-content p {
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  margin-bottom: var(--spacing-sm);
+  line-height: 1.6;
+}
+
+.ocr-hint {
+  font-size: 0.875rem !important;
+  color: var(--color-text-muted) !important;
+  font-style: italic;
 }
 
 @media (max-width: 768px) {

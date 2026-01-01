@@ -77,13 +77,15 @@ class DatabaseService:
         cursor = conn.cursor()
         
         try:
-            # trigram tokenizer 需要至少 3 個字元
-            # 對於短關鍵字（<3字元），使用 LIKE 查詢
-            # 對於長關鍵字，使用 FTS5 MATCH 查詢（更快）
-            if len(keyword) < 3:
-                # 使用 LIKE 查詢支援短關鍵字
+            # 檢查關鍵字是否包含 FTS5 特殊字元
+            special_chars = ['-', '"', '(', ')', '*', ':', '^']
+            has_special_char = any(char in keyword for char in special_chars)
+            
+            # 如果關鍵字太短或包含特殊字元，使用 LIKE 查詢
+            if len(keyword) < 3 or has_special_char:
+                # 使用 LIKE 查詢支援短關鍵字和特殊字元
                 query = '''
-                    SELECT d.id, d.filename, d.filepath, f.page_number, 
+                    SELECT f.doc_id, d.filename, d.filepath, f.page_number, 
                         substr(f.content, max(1, instr(f.content, ?) - 50), 150) as snippet
                     FROM doc_fts f
                     JOIN documents d ON f.doc_id = d.id
@@ -91,9 +93,9 @@ class DatabaseService:
                 '''
                 params = (keyword, f'%{keyword}%')
             else:
-                # 使用 FTS5 MATCH 查詢（支援 trigram）
+                # 使用 FTS5 MATCH 查詢（更快，支援 trigram）
                 query = '''
-                    SELECT d.id, d.filename, d.filepath, f.page_number,
+                    SELECT f.doc_id, d.filename, d.filepath, f.page_number,
                         snippet(doc_fts, 0, '<b>', '</b>', '...', 10) as snippet
                     FROM doc_fts f
                     JOIN documents d ON f.doc_id = d.id
