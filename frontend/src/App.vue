@@ -51,10 +51,11 @@
             <button @click="scanResult = null" class="close-btn">×</button>
           </div>
           <div v-if="scanResult.details" class="scan-result-details">
-            <p>共掃描 {{ scanResult.details.total }} 個檔案</p>
-            <p>✅ 新增: {{ scanResult.details.processed }} 個</p>
-            <p>⏭️ 跳過: {{ scanResult.details.skipped }} 個</p>
-            <p v-if="scanResult.details.failed > 0">❌ 失敗: {{ scanResult.details.failed }} 個</p>
+            <p v-if="scanResult.details.total !== undefined">共掃描 {{ scanResult.details.total || 0 }} 個檔案</p>
+            <p v-if="scanResult.details.total_files !== undefined">共掃描 {{ scanResult.details.total_files || 0 }} 個檔案</p>
+            <p v-if="scanResult.details.processed !== undefined">✅ 新增: {{ scanResult.details.processed || 0 }} 個</p>
+            <p v-if="scanResult.details.skipped !== undefined">⏭️ 跳過: {{ scanResult.details.skipped || 0 }} 個</p>
+            <p v-if="scanResult.details.failed && scanResult.details.failed > 0">❌ 失敗: {{ scanResult.details.failed }} 個</p>
           </div>
         </div>
 
@@ -70,6 +71,60 @@
             <h3>正在處理 PDF 檔案...</h3>
             <p>系統正在使用 OCR 技術辨識文件內容</p>
             <p class="ocr-hint">這可能需要幾秒到幾分鐘，請耐心等候</p>
+          </div>
+        </div>
+
+        <!-- 確認對話框 -->
+        <div v-if="showConfirmDialog" class="confirm-dialog-overlay">
+          <div class="confirm-dialog">
+            <div class="confirm-dialog-header">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3>發現新檔案</h3>
+            </div>
+            
+            <div class="confirm-dialog-content">
+              <p class="file-count">找到 <strong>{{ newFilesInfo.new_files_count }}</strong> 個新的 PDF 檔案需要處理</p>
+              
+              <div class="file-list">
+                <div class="file-list-header">檔案清單：</div>
+                <ul>
+                  <li v-for="(file, index) in newFilesInfo.new_files.slice(0, 10)" :key="index">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span class="filename">{{ file.filename }}</span>
+                    <span class="filesize">({{ formatFileSize(file.size) }})</span>
+                  </li>
+                  <li v-if="newFilesInfo.new_files.length > 10" class="more-files">
+                    ...等 {{ newFilesInfo.new_files.length - 10 }} 個檔案
+                  </li>
+                </ul>
+              </div>
+              
+              <p class="warning-text">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                OCR 處理可能需要一些時間，是否要開始處理？
+              </p>
+            </div>
+            
+            <div class="confirm-dialog-actions">
+              <button @click="cancelProcess" class="btn btn-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                取消
+              </button>
+              <button @click="confirmAndProcess" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                確認處理
+              </button>
+            </div>
           </div>
         </div>
 
@@ -142,7 +197,7 @@ import DocumentItem from './components/DocumentItem.vue'
 // API 位址 - 自動偵測（localhost 和外網都能用）
 const API_BASE_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:8000'  // 本機使用
-  : 'http://100.83.146.90:8000'  // 外網使用
+  : `http://${window.location.hostname}:8000`  // 外網使用當前主機名稱
 
 export default {
   name: 'App',
@@ -158,7 +213,9 @@ export default {
       scanning: false,
       error: null,
       totalDocuments: 0,
-      scanResult: null
+      scanResult: null,
+      showConfirmDialog: false,
+      newFilesInfo: null
     }
   },
   mounted() {
@@ -218,6 +275,53 @@ export default {
       this.scanResult = null
       
       try {
+        // 第一步：檢查新檔案
+        const checkResponse = await fetch(`${API_BASE_URL}/api/ocr/check`)
+        const checkData = await checkResponse.json()
+        
+        if (checkData.success) {
+          const info = checkData.data
+          
+          // 如果沒有新檔案
+          if (info.new_files_count === 0) {
+            this.scanResult = {
+              type: 'info',
+              message: info.total_files === 0 ? '資料夾中沒有 PDF 檔案' : '沒有新檔案需要處理',
+              details: info
+            }
+            this.scanning = false
+            return
+          }
+          
+          // 有新檔案，顯示確認對話框
+          this.newFilesInfo = info
+          this.showConfirmDialog = true
+          this.scanning = false
+        } else {
+          this.scanResult = {
+            type: 'error',
+            message: '檢查檔案失敗'
+          }
+          this.scanning = false
+        }
+      } catch (err) {
+        this.scanResult = {
+          type: 'error',
+          message: '檢查檔案時發生錯誤: ' + err.message
+        }
+        console.error('Error checking files:', err)
+        this.scanning = false
+      }
+    },
+    
+    async confirmAndProcess() {
+      // 關閉對話框
+      this.showConfirmDialog = false
+      this.scanning = true
+      this.scanResult = null
+      
+      try {
+        // 第二步：執行 OCR 處理
         const response = await fetch(`${API_BASE_URL}/api/ocr/scan`, {
           method: 'POST'
         })
@@ -234,34 +338,42 @@ export default {
             }
             // 重新載入文件列表
             await this.fetchDocuments()
-          } else if (result.total === 0) {
-            this.scanResult = {
-              type: 'info',
-              message: '資料夾中沒有 PDF 檔案',
-              details: result
-            }
           } else {
             this.scanResult = {
               type: 'info',
-              message: '沒有新檔案需要處理',
+              message: '沒有檔案被處理',
               details: result
             }
           }
         } else {
           this.scanResult = {
             type: 'error',
-            message: '掃描失敗'
+            message: '處理失敗'
           }
         }
       } catch (err) {
         this.scanResult = {
           type: 'error',
-          message: '掃描時發生錯誤: ' + err.message
+          message: '處理時發生錯誤: ' + err.message
         }
-        console.error('Error scanning:', err)
+        console.error('Error processing:', err)
       } finally {
         this.scanning = false
+        this.newFilesInfo = null
       }
+    },
+    
+    cancelProcess() {
+      this.showConfirmDialog = false
+      this.newFilesInfo = null
+    },
+    
+    formatFileSize(bytes) {
+      if (bytes === 0) return '0 Bytes'
+      const k = 1024
+      const sizes = ['Bytes', 'KB', 'MB', 'GB']
+      const i = Math.floor(Math.log(bytes) / Math.log(k))
+      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
     }
   }
 }
@@ -559,6 +671,185 @@ export default {
   font-size: 0.875rem !important;
   color: var(--color-text-muted) !important;
   font-style: italic;
+}
+
+/* 確認對話框 */
+.confirm-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn var(--transition-normal);
+}
+
+.confirm-dialog {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-xl);
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease-out;
+}
+
+.confirm-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xl);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.confirm-dialog-header svg {
+  width: 32px;
+  height: 32px;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.confirm-dialog-header h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.confirm-dialog-content {
+  padding: var(--spacing-xl);
+}
+
+.file-count {
+  font-size: 1.125rem;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-lg);
+  text-align: center;
+}
+
+.file-count strong {
+  color: var(--color-primary);
+  font-size: 1.5rem;
+}
+
+.file-list {
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.file-list-header {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  margin-bottom: var(--spacing-sm);
+}
+
+.file-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.file-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.file-list li:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.file-list li svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.file-list .filename {
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  flex: 1;
+}
+
+.file-list .filesize {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.file-list .more-files {
+  color: var(--color-text-muted);
+  font-style: italic;
+  justify-content: center;
+  margin-top: var(--spacing-xs);
+}
+
+.warning-text {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: var(--radius-md);
+  color: #93c5fd;
+  font-size: 0.875rem;
+}
+
+.warning-text svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xl);
+  border-top: 1px solid var(--color-border);
+  justify-content: flex-end;
+}
+
+.confirm-dialog-actions .btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.confirm-dialog-actions .btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-secondary {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
 }
 
 @media (max-width: 768px) {

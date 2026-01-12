@@ -118,6 +118,40 @@ class OCRService:
         finally:
             conn.close()
     
+    def check_new_files(self) -> Dict:
+        """
+        檢查 factory 資料夾中有哪些新的 PDF 檔案需要處理
+        (不執行 OCR，只返回檔案資訊)
+        
+        Returns:
+            新檔案的數量和詳細資訊
+        """
+        if not self.factory_path.exists():
+            raise Exception(f"資料夾不存在: {self.factory_path}")
+        
+        # 取得所有 PDF 檔案
+        pdf_files = list(self.factory_path.glob("*.pdf"))
+        
+        new_files = []
+        for pdf_path in pdf_files:
+            filename = pdf_path.name
+            filepath = str(pdf_path.absolute())
+            
+            # 檢查是否已在資料庫
+            if not self.is_file_in_db(filename):
+                file_size = pdf_path.stat().st_size
+                new_files.append({
+                    "filename": filename,
+                    "filepath": filepath,
+                    "size": file_size
+                })
+        
+        return {
+            "new_files_count": len(new_files),
+            "new_files": new_files,
+            "total_files": len(pdf_files)
+        }
+    
     def scan_factory_folder(self) -> Dict:
         """
         掃描 factory 資料夾下的所有 PDF 檔案，
