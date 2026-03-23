@@ -60,26 +60,18 @@
         </div>
 
         <!-- OCR 處理中提示 -->
-        <div v-if="scanning && scanProgress && showProgressPanel" class="ocr-progress-panel">
-          <div class="ocr-progress-head">
-            <div class="ocr-progress-title">
+        <div v-if="scanning" class="ocr-processing-overlay">
+          <div class="ocr-processing-content">
+            <div class="ocr-spinner">
               <svg class="loading" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span>OCR 執行中</span>
             </div>
-            <button class="close-btn" @click="hideProgressPanel" title="隱藏進度面板">×</button>
+            <h3>正在處理 PDF 檔案...</h3>
+            <p>系統正在使用 OCR 技術辨識文件內容</p>
+            <p class="ocr-hint">這可能需要幾秒到幾分鐘，請耐心等候</p>
           </div>
-          <p class="ocr-progress-text">
-            {{ scanProgress.current_file ? `目前檔案：${scanProgress.current_file}` : '正在準備 OCR 任務...' }}
-          </p>
-          <div class="ocr-progress-track">
-            <div class="ocr-progress-bar" :style="{ width: `${scanProgress.progress_percent || 0}%` }"></div>
-          </div>
-          <p class="ocr-progress-meta">
-            {{ scanProgress.processed || 0 }} 成功 / {{ scanProgress.skipped || 0 }} 跳過 / {{ scanProgress.failed || 0 }} 失敗 · {{ scanProgress.progress_percent || 0 }}%
-          </p>
         </div>
 
         <!-- 確認對話框 -->
@@ -223,18 +215,11 @@ export default {
       totalDocuments: 0,
       scanResult: null,
       showConfirmDialog: false,
-      newFilesInfo: null,
-      scanJobId: null,
-      scanProgress: null,
-      showProgressPanel: true,
-      scanPollingTimer: null
+      newFilesInfo: null
     }
   },
   mounted() {
     this.fetchDocuments()
-  },
-  beforeUnmount() {
-    this.stopScanPolling()
   },
   methods: {
     async fetchDocuments() {
@@ -330,70 +315,41 @@ export default {
     },
     
     async confirmAndProcess() {
+      // 關閉對話框
       this.showConfirmDialog = false
       this.scanning = true
       this.scanResult = null
-      this.showProgressPanel = true
-      this.scanProgress = {
-        processed: 0,
-        skipped: 0,
-        failed: 0,
-        total: this.newFilesInfo?.total_files || 0,
-        progress_percent: 0,
-        current_file: null
-      }
       
       try {
-        let response = await fetch(`${API_BASE_URL}/api/ocr/scan/start`, {
+        // 第二步：執行 OCR 處理
+        const response = await fetch(`${API_BASE_URL}/api/ocr/scan`, {
           method: 'POST'
         })
-
-        // Backward compatibility: backend still running old version without /scan/start
-        if (response.status === 404) {
-          const legacyResponse = await fetch(`${API_BASE_URL}/api/ocr/scan`, {
-            method: 'POST'
-          })
-          const legacyData = await legacyResponse.json()
-          if (!legacyResponse.ok || !legacyData.success) {
-            throw new Error(legacyData.detail || '啟動 OCR 任務失敗')
-          }
-
-          const result = legacyData.data
-          this.scanning = false
-          this.newFilesInfo = null
-          this.scanProgress = null
-
-          if ((result.processed || 0) > 0) {
+        const data = await response.json()
+        
+        if (data.success) {
+          const result = data.data
+          
+          if (result.processed > 0) {
             this.scanResult = {
               type: 'success',
               message: `成功處理 ${result.processed} 個新檔案！`,
               details: result
             }
+            // 重新載入文件列表
             await this.fetchDocuments()
           } else {
             this.scanResult = {
               type: 'info',
-              message: '掃描完成，沒有新檔案需要處理',
+              message: '沒有檔案被處理',
               details: result
             }
           }
-          return
-        }
-
-        const data = await response.json()
-
-        if (!response.ok) {
-          throw new Error(data.detail || '啟動 OCR 任務失敗')
-        }
-        
-        if (data.success) {
-          this.scanJobId = data.data?.job_id || null
-          if (!this.scanJobId) {
-            throw new Error('無法取得 OCR 任務 ID')
-          }
-          this.startScanPolling()
         } else {
-          throw new Error(data.detail || '啟動 OCR 任務失敗')
+          this.scanResult = {
+            type: 'error',
+            message: '處理失敗'
+          }
         }
       } catch (err) {
         this.scanResult = {
@@ -401,94 +357,9 @@ export default {
           message: '處理時發生錯誤: ' + err.message
         }
         console.error('Error processing:', err)
+      } finally {
         this.scanning = false
         this.newFilesInfo = null
-        this.stopScanPolling()
-      }
-    },
-
-    hideProgressPanel() {
-      this.showProgressPanel = false
-    },
-
-    startScanPolling() {
-      this.stopScanPolling()
-      this.scanPollingTimer = setInterval(() => {
-        this.fetchScanStatus()
-      }, 1500)
-      this.fetchScanStatus()
-    },
-
-    stopScanPolling() {
-      if (this.scanPollingTimer) {
-        clearInterval(this.scanPollingTimer)
-        this.scanPollingTimer = null
-      }
-    },
-
-    async fetchScanStatus() {
-      if (!this.scanJobId) {
-        return
-      }
-
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/ocr/scan/status/${this.scanJobId}`)
-        const data = await response.json()
-        if (!data.success) {
-          throw new Error('無法取得 OCR 進度')
-        }
-
-        this.scanProgress = data.data
-
-        if (data.data.status === 'completed') {
-          this.stopScanPolling()
-          this.scanning = false
-          this.newFilesInfo = null
-          this.scanJobId = null
-
-          const result = data.data.result || {
-            total: data.data.total,
-            processed: data.data.processed,
-            skipped: data.data.skipped,
-            failed: data.data.failed
-          }
-
-          if ((result.processed || 0) > 0) {
-            this.scanResult = {
-              type: 'success',
-              message: `成功處理 ${result.processed} 個新檔案！`,
-              details: result
-            }
-            await this.fetchDocuments()
-          } else {
-            this.scanResult = {
-              type: 'info',
-              message: '掃描完成，沒有新檔案需要處理',
-              details: result
-            }
-          }
-          return
-        }
-
-        if (data.data.status === 'failed') {
-          this.stopScanPolling()
-          this.scanning = false
-          this.newFilesInfo = null
-          this.scanJobId = null
-          this.scanResult = {
-            type: 'error',
-            message: `OCR 任務失敗: ${data.data.error || '未知錯誤'}`
-          }
-        }
-      } catch (err) {
-        this.stopScanPolling()
-        this.scanning = false
-        this.newFilesInfo = null
-        this.scanJobId = null
-        this.scanResult = {
-          type: 'error',
-          message: '取得 OCR 進度失敗: ' + err.message
-        }
       }
     },
     
@@ -726,78 +597,30 @@ export default {
 }
 
 /* OCR 處理中提示 */
-.ocr-progress-panel {
+.ocr-processing-overlay {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
-  width: min(420px, calc(100vw - 40px));
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn var(--transition-normal);
+}
+
+.ocr-processing-content {
+  text-align: center;
+  padding: var(--spacing-2xl);
   background: var(--color-bg-secondary);
+  border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
-  padding: var(--spacing-md);
-  z-index: 950;
-}
-
-.ocr-progress-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-sm);
-}
-
-.ocr-progress-title {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  color: var(--color-text-primary);
-  font-weight: 600;
-}
-
-.ocr-progress-title svg {
-  width: 18px;
-  height: 18px;
-}
-
-.ocr-progress-text {
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
-  margin: 0 0 var(--spacing-sm) 0;
-}
-
-.ocr-progress-track {
-  width: 100%;
-  height: 8px;
-  background: var(--color-bg-tertiary);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.ocr-progress-bar {
-  height: 100%;
-  background: var(--gradient-primary);
-  transition: width 0.3s ease;
-}
-
-.ocr-progress-meta {
-  margin: var(--spacing-sm) 0 0 0;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-.ocr-progress-head .close-btn {
-  margin-left: 0;
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
-  font-size: 1.2rem;
-  cursor: pointer;
-  width: 28px;
-  height: 28px;
-}
-
-.ocr-progress-head .close-btn:hover {
-  color: var(--color-text-primary);
+  max-width: 400px;
+  animation: slideUp 0.3s ease-out;
 }
 
 @keyframes slideUp {
@@ -809,6 +632,45 @@ export default {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.ocr-spinner {
+  margin: 0 auto var(--spacing-lg);
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ocr-spinner svg {
+  width: 100%;
+  height: 100%;
+  color: var(--color-primary);
+}
+
+.ocr-processing-content h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-md);
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ocr-processing-content p {
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  margin-bottom: var(--spacing-sm);
+  line-height: 1.6;
+}
+
+.ocr-hint {
+  font-size: 0.875rem !important;
+  color: var(--color-text-muted) !important;
+  font-style: italic;
 }
 
 /* 確認對話框 */
