@@ -7,7 +7,7 @@ import glob
 import sqlite3
 import numpy as np
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional, Callable, Any
 from paddleocr import PaddleOCR
 from pdf2image import convert_from_path
 
@@ -152,7 +152,7 @@ class OCRService:
             "total_files": len(pdf_files)
         }
     
-    def scan_factory_folder(self) -> Dict:
+    def scan_factory_folder(self, progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None) -> Dict:
         """
         掃描 factory 資料夾下的所有 PDF 檔案，
         若檔名不在資料庫則進行 OCR 並存入資料庫
@@ -180,9 +180,31 @@ class OCRService:
         failed_count = 0
         details = []
         
-        for pdf_path in pdf_files:
+        total_files = len(pdf_files)
+
+        if progress_callback:
+            progress_callback({
+                "event": "start",
+                "total": total_files,
+                "processed": processed_count,
+                "skipped": skipped_count,
+                "failed": failed_count
+            })
+
+        for index, pdf_path in enumerate(pdf_files, start=1):
             filename = pdf_path.name
             filepath = str(pdf_path.absolute())
+
+            if progress_callback:
+                progress_callback({
+                    "event": "file_started",
+                    "index": index,
+                    "total": total_files,
+                    "current_file": filename,
+                    "processed": processed_count,
+                    "skipped": skipped_count,
+                    "failed": failed_count
+                })
             
             # 檢查是否已在資料庫
             if self.is_file_in_db(filename):
@@ -192,6 +214,18 @@ class OCRService:
                     "status": "skipped",
                     "message": "已存在資料庫"
                 })
+
+                if progress_callback:
+                    progress_callback({
+                        "event": "file_done",
+                        "index": index,
+                        "total": total_files,
+                        "current_file": filename,
+                        "status": "skipped",
+                        "processed": processed_count,
+                        "skipped": skipped_count,
+                        "failed": failed_count
+                    })
                 continue
             
             # 進行 OCR
@@ -206,6 +240,18 @@ class OCRService:
                     "doc_id": doc_id,
                     "pages": len(page_results)
                 })
+
+                if progress_callback:
+                    progress_callback({
+                        "event": "file_done",
+                        "index": index,
+                        "total": total_files,
+                        "current_file": filename,
+                        "status": "success",
+                        "processed": processed_count,
+                        "skipped": skipped_count,
+                        "failed": failed_count
+                    })
             except Exception as e:
                 failed_count += 1
                 details.append({
@@ -213,11 +259,34 @@ class OCRService:
                     "status": "failed",
                     "message": str(e)
                 })
-        
-        return {
+
+                if progress_callback:
+                    progress_callback({
+                        "event": "file_done",
+                        "index": index,
+                        "total": total_files,
+                        "current_file": filename,
+                        "status": "failed",
+                        "processed": processed_count,
+                        "skipped": skipped_count,
+                        "failed": failed_count
+                    })
+
+        result = {
             "total": len(pdf_files),
             "processed": processed_count,
             "skipped": skipped_count,
             "failed": failed_count,
             "details": details
         }
+
+        if progress_callback:
+            progress_callback({
+                "event": "completed",
+                "total": total_files,
+                "processed": processed_count,
+                "skipped": skipped_count,
+                "failed": failed_count
+            })
+
+        return result
