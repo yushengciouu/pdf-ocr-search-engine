@@ -24,7 +24,7 @@ class OCRService:
     def _get_ocr(self):
         """取得 OCR 實例（延遲初始化）"""
         if self.ocr is None:
-            self.ocr = PaddleOCR(use_angle_cls=True, lang="ch")
+            self.ocr = PaddleOCR(use_angle_cls=True, lang="ch", use_gpu=True)
         return self.ocr
     
     def ocr_pdf(self, pdf_path: str) -> List[Dict]:
