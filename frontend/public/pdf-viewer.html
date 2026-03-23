@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Viewer</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", sans-serif;
+        background: #eef3f8;
+        color: #16324f;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      .page {
+        min-height: 100vh;
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 20px;
+        background: linear-gradient(135deg, #0f4c81, #157f6b);
+        color: #fff;
+      }
+      .title {
+        font-size: 16px;
+        font-weight: 600;
+        word-break: break-all;
+      }
+      .actions a {
+        color: #fff;
+        text-decoration: none;
+        border: 1px solid rgba(255, 255, 255, 0.38);
+        border-radius: 999px;
+        padding: 8px 12px;
+      }
+      .viewer {
+        padding: 16px;
+        height: calc(100vh - 68px);
+      }
+      .pdf-frame,
+      object,
+      embed,
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+      }
+      .message {
+        display: grid;
+        place-items: center;
+        height: 100%;
+        text-align: center;
+        color: #4b5563;
+        line-height: 1.8;
+      }
+      .message strong {
+        display: block;
+        margin-bottom: 8px;
+        color: #16324f;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div class="title" id="title">PDF Viewer</div>
+        <div class="actions" id="actions"></div>
+      </header>
+      <main class="viewer" id="viewerRoot">
+        <div class="message" id="message">載入中...</div>
+      </main>
+    </div>
+
+    <script>
+      const params = new URLSearchParams(window.location.search)
+      const docId = params.get('docId')
+      const filename = params.get('filename') || 'PDF Viewer'
+      const backendBase = window.location.hostname === 'localhost'
+        ? 'http://localhost:8000'
+        : `http://${window.location.hostname}:8000`
+
+      document.getElementById('title').textContent = filename
+
+      async function mountPdf() {
+        if (!docId) {
+          document.getElementById('message').textContent = '找不到文件 ID'
+          return
+        }
+
+        const pdfUrl = `${backendBase}/api/documents/${docId}/pdf`
+
+        try {
+          const response = await fetch(pdfUrl)
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`)
+          }
+
+          const blob = await response.blob()
+          const blobUrl = URL.createObjectURL(blob)
+          const viewerUrl = `${blobUrl}#toolbar=1&navpanes=0`
+
+          const object = document.createElement('object')
+          object.data = viewerUrl
+          object.type = 'application/pdf'
+          object.className = 'pdf-frame'
+
+          const embed = document.createElement('embed')
+          embed.src = viewerUrl
+          embed.type = 'application/pdf'
+
+          const fallback = document.createElement('div')
+          fallback.className = 'message'
+          fallback.innerHTML = '<div><strong>這個瀏覽器無法直接內嵌顯示 PDF</strong>請改用支援內建 PDF 檢視的瀏覽器，例如 Chrome 或 Edge。</div>'
+
+          object.appendChild(embed)
+          object.appendChild(fallback)
+          document.getElementById('viewerRoot').replaceChildren(object)
+        } catch (error) {
+          document.getElementById('viewerRoot').innerHTML = '<div class="message"><div><strong>PDF 載入失敗</strong>請確認後端服務是否正在運行，或稍後再試一次。</div></div>'
+        }
+      }
+
+      mountPdf()
+    </script>
+  </body>
+</html>
