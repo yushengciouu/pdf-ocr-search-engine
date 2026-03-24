@@ -28,11 +28,25 @@
           <p v-html="document.snippet"></p>
         </div>
       </div>
+
+      <!-- PDF 檢視按鈕 -->
+      <div class="document-actions">
+        <button class="btn-view-pdf" @click="openPdf" title="在新視窗開啟 PDF">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+          <span>檢視 PDF</span>
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
+const API_BASE_URL = window.location.hostname === 'localhost'
+  ? 'http://localhost:8000'
+  : `http://${window.location.hostname}:8000`
+
 export default {
   name: 'DocumentItem',
   props: {
@@ -52,6 +66,29 @@ export default {
         hour: '2-digit',
         minute: '2-digit'
       })
+    },
+    openPdf() {
+      const docId = this.document.doc_id || this.document.id
+      if (!docId) return
+      const pdfUrl = `${API_BASE_URL}/api/documents/${docId}/pdf`
+      const filename = this.document.filename || 'PDF 文件'
+      const win = window.open('', '_blank')
+      win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${filename}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #525659; overflow: hidden; }
+    embed { display: block; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <embed src="${pdfUrl}" type="application/pdf" width="100%" height="100%" />
+</body>
+</html>`)
+      win.document.close()
     }
   }
 }
@@ -171,5 +208,41 @@ export default {
   background: rgba(99, 102, 241, 0.1);
   padding: 2px 4px;
   border-radius: 2px;
+}
+
+/* PDF 檢視按鈕 */
+.document-actions {
+  display: flex;
+  align-items: flex-start;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.btn-view-pdf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary-light);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.btn-view-pdf:hover {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: var(--color-primary);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.btn-view-pdf:active {
+  transform: translateY(0);
 }
 </style>

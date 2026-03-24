@@ -73,7 +73,9 @@ async def get_document_pdf(doc_id: int):
         return FileResponse(
             path=str(pdf_path),
             media_type="application/pdf",
-            filename=document["filename"],
+            headers={
+                "Content-Disposition": f"inline; filename*=UTF-8''{document['filename']}"
+            },
         )
     except HTTPException:
         raise
