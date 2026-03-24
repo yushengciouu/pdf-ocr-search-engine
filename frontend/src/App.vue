@@ -59,18 +59,22 @@
           </div>
         </div>
 
-        <!-- OCR 處理中提示 -->
-        <div v-if="scanning" class="ocr-processing-overlay">
-          <div class="ocr-processing-content">
-            <div class="ocr-spinner">
+        <!-- OCR 處理中 Toast (右下角非阻擋式) -->
+        <div v-if="scanning && scanProgress" class="ocr-progress-toast">
+          <div class="ocr-progress-header">
+            <div class="ocr-spinner-small">
               <svg class="loading" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             </div>
-            <h3>正在處理 PDF 檔案...</h3>
-            <p>系統正在使用 OCR 技術辨識文件內容</p>
-            <p class="ocr-hint">這可能需要幾秒到幾分鐘，請耐心等候</p>
+            <strong>OCR 處理中 ({{ scanProgress.current }} / {{ scanProgress.total }})</strong>
+          </div>
+          <div class="ocr-progress-body">
+            <p class="current-file">正在掃描: <span>{{ scanProgress.currentFilename }}</span></p>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" :style="{ width: `${(scanProgress.current / scanProgress.total) * 100}%` }"></div>
+            </div>
           </div>
         </div>
 
@@ -215,7 +219,8 @@ export default {
       totalDocuments: 0,
       scanResult: null,
       showConfirmDialog: false,
-      newFilesInfo: null
+      newFilesInfo: null,
+      scanProgress: null
     }
   },
   computed: {
@@ -341,36 +346,52 @@ export default {
       this.scanning = true
       this.scanResult = null
       
+      const filesToProcess = this.newFilesInfo.new_files || []
+      const total = filesToProcess.length
+      
+      this.scanProgress = {
+        current: 0,
+        total: total,
+        currentFilename: ''
+      }
+      
+      let processed = 0
+      let skipped = 0
+      let failed = 0
+      
       try {
-        // 第二步：執行 OCR 處理
-        const response = await fetch(`${API_BASE_URL}/api/ocr/scan`, {
-          method: 'POST'
-        })
-        const data = await response.json()
-        
-        if (data.success) {
-          const result = data.data
+        // 逐個檔案進行 OCR，讓前端不被阻擋並且能顯示進度
+        for (let i = 0; i < total; i++) {
+          const file = filesToProcess[i]
+          this.scanProgress.current = i + 1
+          this.scanProgress.currentFilename = file.filename
           
-          if (result.processed > 0) {
-            this.scanResult = {
-              type: 'success',
-              message: `成功處理 ${result.processed} 個新檔案！`,
-              details: result
-            }
-            // 重新載入文件列表
-            await this.fetchDocuments()
+          const response = await fetch(`${API_BASE_URL}/api/ocr/scan_file`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ filename: file.filename })
+          })
+          
+          const data = await response.json()
+          
+          if (data.success && data.data.status === 'success') {
+            processed++
+          } else if (data.success && data.data.status === 'skipped') {
+            skipped++
           } else {
-            this.scanResult = {
-              type: 'info',
-              message: '沒有檔案被處理',
-              details: result
-            }
+            failed++
           }
-        } else {
-          this.scanResult = {
-            type: 'error',
-            message: '處理失敗'
-          }
+          
+          // 每處理完一個檔案就更新一次搜尋列表，讓使用者能邊等邊查
+          await this.fetchDocuments()
+        }
+        
+        this.scanResult = {
+          type: processed > 0 ? 'success' : 'info',
+          message: processed > 0 ? `成功處理 ${processed} 個新檔案！` : '沒有檔案被處理',
+          details: { processed, skipped, failed, total }
         }
       } catch (err) {
         this.scanResult = {
@@ -380,6 +401,7 @@ export default {
         console.error('Error processing:', err)
       } finally {
         this.scanning = false
+        this.scanProgress = null
         this.newFilesInfo = null
       }
     },
@@ -617,81 +639,85 @@ export default {
   color: var(--color-text-secondary);
 }
 
-/* OCR 處理中提示 */
-.ocr-processing-overlay {
+/* OCR 進度 Toast 卡片 (右下角) */
+.ocr-progress-toast {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(15, 23, 42, 0.95);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  animation: fadeIn var(--transition-normal);
-}
-
-.ocr-processing-content {
-  text-align: center;
-  padding: var(--spacing-2xl);
+  bottom: var(--spacing-xl);
+  right: var(--spacing-xl);
+  width: 320px;
   background: var(--color-bg-secondary);
-  border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-xl);
-  max-width: 400px;
-  animation: slideUp 0.3s ease-out;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(50px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
-.ocr-spinner {
-  margin: 0 auto var(--spacing-lg);
-  width: 80px;
-  height: 80px;
+.ocr-progress-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: rgba(99, 102, 241, 0.1);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ocr-spinner-small {
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.ocr-spinner svg {
+.ocr-spinner-small svg {
   width: 100%;
   height: 100%;
   color: var(--color-primary);
 }
 
-.ocr-processing-content h3 {
-  font-size: 1.5rem;
+.ocr-progress-header strong {
+  font-size: 0.875rem;
+  color: var(--color-primary-light);
   font-weight: 600;
-  color: var(--color-text-primary);
-  margin-bottom: var(--spacing-md);
-  background: var(--gradient-primary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
-.ocr-processing-content p {
+.ocr-progress-body {
+  padding: var(--spacing-md);
+}
+
+.current-file {
+  font-size: 0.8125rem;
   color: var(--color-text-secondary);
-  font-size: 1rem;
   margin-bottom: var(--spacing-sm);
-  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.ocr-hint {
-  font-size: 0.875rem !important;
-  color: var(--color-text-muted) !important;
-  font-style: italic;
+.current-file span {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.progress-bar-container {
+  height: 6px;
+  background: var(--color-bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--gradient-primary);
+  border-radius: 3px;
+  transition: width 0.3s ease-out;
 }
 
 /* 確認對話框 */

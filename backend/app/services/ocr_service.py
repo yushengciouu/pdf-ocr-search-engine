@@ -228,3 +228,51 @@ class OCRService:
             "failed": failed_count,
             "details": details,
         }
+
+    def scan_single_file(self, filename: str) -> Dict:
+        """
+        掃描單一 PDF 檔案
+        
+        Args:
+            filename: 檔案名稱
+            
+        Returns:
+            處理結果
+        """
+        if not self.factory_path.exists():
+            raise Exception(f"資料夾不存在: {self.factory_path}")
+            
+        pdf_path = self.factory_path / filename
+        if not pdf_path.exists() or not pdf_path.is_file():
+            raise Exception(f"檔案不存在: {filename}")
+            
+        filepath = str(pdf_path.absolute())
+        
+        # 檢查是否已在資料庫
+        if self.is_file_in_db(filename):
+            return {
+                "success": False,
+                "filename": filename,
+                "status": "skipped",
+                "message": "已存在資料庫"
+            }
+            
+        # 進行 OCR
+        try:
+            page_results = self.ocr_pdf(str(pdf_path))
+            doc_id = self.save_to_db(filename, filepath, page_results)
+            return {
+                "success": True,
+                "filename": filename,
+                "status": "success",
+                "message": f"成功處理 {len(page_results)} 頁",
+                "doc_id": doc_id,
+                "pages": len(page_results)
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "filename": filename,
+                "status": "failed",
+                "message": str(e)
+            }

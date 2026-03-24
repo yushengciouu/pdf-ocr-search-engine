@@ -2,10 +2,14 @@
 OCR 相關的 API 路由
 """
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from ..services.ocr_service import OCRService
 
 router = APIRouter(prefix="/api/ocr", tags=["ocr"])
 ocr_service = OCRService()
+
+class ScanFileRequest(BaseModel):
+    filename: str
 
 
 @router.get("/check")
@@ -39,6 +43,20 @@ async def scan_factory_folder():
         result = ocr_service.scan_factory_folder()
         return {
             "success": True,
+            "data": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/scan_file")
+async def scan_single_file(request: ScanFileRequest):
+    """
+    掃描單一 PDF 檔案
+    """
+    try:
+        result = ocr_service.scan_single_file(request.filename)
+        return {
+            "success": result["success"],
             "data": result
         }
     except Exception as e:
