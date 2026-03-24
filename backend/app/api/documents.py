@@ -67,6 +67,13 @@ async def get_document_pdf(doc_id: int):
             raise HTTPException(status_code=404, detail="找不到該文件")
 
         pdf_path = Path(document["filepath"])
+        
+        # 跨平台相容處理：如果絕對路徑 (例如 Windows 路徑在 Docker 內) 找不到檔案，
+        # 就嘗試直接從 factory 資料夾尋找該檔名的檔案。
+        if not pdf_path.exists() or not pdf_path.is_file():
+            factory_path = Path(__file__).parent.parent.parent.parent / "factory"
+            pdf_path = factory_path / document["filename"]
+            
         if not pdf_path.exists() or not pdf_path.is_file():
             raise HTTPException(status_code=404, detail="找不到對應的 PDF 檔案")
 

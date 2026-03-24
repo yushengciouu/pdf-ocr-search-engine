@@ -1,0 +1,22 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# OS/IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Database & Data (不用打包進鏡像，因為我們會採用 volume 掛載機制)
+fuyu.sqlite
+fuyu.db
+/factory/
+/PDFs/
