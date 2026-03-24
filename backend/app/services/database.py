@@ -109,12 +109,22 @@ class DatabaseService:
             
             search_results = []
             for row in results:
+                snippet_text = row[4]
+                
+                # 如果是 LIKE 查詢，SQLite 不會自動加上 <b>，需要我們透過 Python 手動補上
+                if len(keyword) < 3 or has_special_char:
+                    # 先逸出關鍵字避免正則錯誤
+                    import re
+                    escaped_kw = re.escape(keyword)
+                    # 不區分大小寫替換
+                    snippet_text = re.sub(f'({escaped_kw})', r'<b>\1</b>', snippet_text, flags=re.IGNORECASE)
+                    
                 search_results.append({
                     "doc_id": row[0],
                     "filename": row[1],
                     "filepath": row[2],
                     "page_number": row[3],
-                    "snippet": row[4]
+                    "snippet": snippet_text
                 })
             
             return search_results
