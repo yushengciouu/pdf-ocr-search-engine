@@ -151,13 +151,13 @@
         <div v-else-if="searchResults.length > 0">
           <div class="results-header">
             <h2>搜尋結果</h2>
-            <span class="results-count">找到 {{ searchResults.length }} 筆結果</span>
+            <span class="results-count">找到 {{ groupedSearchResults.length }} 份文件 ({{ searchResults.length }} 頁)</span>
           </div>
           <div class="documents-list">
             <DocumentItem
-              v-for="doc in searchResults"
-              :key="`search-${doc.doc_id}-${doc.page_number}`"
-              :document="doc"
+              v-for="group in groupedSearchResults"
+              :key="`search-group-${group.doc_id}`"
+              :document="group"
             />
           </div>
         </div>
@@ -216,6 +216,27 @@ export default {
       scanResult: null,
       showConfirmDialog: false,
       newFilesInfo: null
+    }
+  },
+  computed: {
+    groupedSearchResults() {
+      const map = new Map()
+      for (const item of this.searchResults) {
+        const key = item.doc_id
+        if (!map.has(key)) {
+          map.set(key, {
+            doc_id: item.doc_id,
+            filename: item.filename,
+            upload_date: item.upload_date,
+            pages: []
+          })
+        }
+        map.get(key).pages.push({
+          page_number: item.page_number,
+          snippet: item.snippet
+        })
+      }
+      return Array.from(map.values())
     }
   },
   mounted() {

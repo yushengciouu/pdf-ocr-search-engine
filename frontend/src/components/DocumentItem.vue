@@ -6,11 +6,19 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
         </svg>
       </div>
-      
+
       <div class="document-info">
         <h3 class="document-title">{{ document.filename }}</h3>
         <div class="document-meta">
-          <span v-if="document.page_number" class="meta-item page-badge">
+          <!-- 多頁模式：顯示共幾頁命中 -->
+          <span v-if="isGrouped" class="meta-item page-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="14" height="14">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            {{ document.pages.length }} 頁命中
+          </span>
+          <!-- 單頁模式 -->
+          <span v-else-if="document.page_number" class="meta-item page-badge">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="14" height="14">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
@@ -23,8 +31,23 @@
             {{ formatDate(document.upload_date) }}
           </span>
         </div>
-        
-        <div v-if="document.snippet" class="document-snippet">
+
+        <!-- 多頁模式：每頁一個 snippet 區塊 -->
+        <div v-if="isGrouped" class="pages-list">
+          <div
+            v-for="page in document.pages"
+            :key="page.page_number"
+            class="page-entry"
+          >
+            <span class="page-label">第 {{ page.page_number }} 頁</span>
+            <div v-if="page.snippet" class="document-snippet">
+              <p v-html="page.snippet"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 單頁模式 -->
+        <div v-else-if="document.snippet" class="document-snippet">
           <p v-html="document.snippet"></p>
         </div>
       </div>
@@ -53,6 +76,11 @@ export default {
     document: {
       type: Object,
       required: true
+    }
+  },
+  computed: {
+    isGrouped() {
+      return Array.isArray(this.document.pages)
     }
   },
   methods: {
@@ -192,6 +220,29 @@ export default {
   font-weight: 500;
 }
 
+/* 多頁列表 */
+.pages-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.page-entry {
+  border-left: 2px solid rgba(99, 102, 241, 0.35);
+  padding-left: var(--spacing-sm);
+}
+
+.page-label {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary-light);
+  background: rgba(99, 102, 241, 0.1);
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+}
+
 .document-snippet {
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-bg-primary);
@@ -199,7 +250,6 @@ export default {
   font-size: 0.8125rem;
   line-height: 1.6;
   color: var(--color-text-secondary);
-  margin-top: var(--spacing-sm);
 }
 
 .document-snippet :deep(b) {
