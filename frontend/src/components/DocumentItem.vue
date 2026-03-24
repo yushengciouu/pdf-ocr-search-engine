@@ -98,7 +98,8 @@ export default {
     openPdf() {
       const docId = this.document.doc_id || this.document.id
       if (!docId) return
-      const pdfUrl = `${API_BASE_URL}/api/documents/${docId}/pdf`
+      // 加上時間戳記強制解快取，解決 Edge 瀏覽器讀取錯誤快取檔案的問題
+      const pdfUrl = `${API_BASE_URL}/api/documents/${docId}/pdf?t=${Date.now()}`
       const filename = this.document.filename || 'PDF 文件'
       const win = window.open('', '_blank')
       win.document.write(`<!DOCTYPE html>
