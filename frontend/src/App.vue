@@ -61,14 +61,19 @@
 
         <!-- OCR 處理中 Toast (右下角非阻擋式) -->
         <div v-if="scanning && scanProgress" class="ocr-progress-toast">
-          <div class="ocr-progress-header">
-            <div class="ocr-spinner-small">
-              <svg class="loading" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+          <div class="ocr-progress-header" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="ocr-spinner-small">
+                <svg class="loading" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+              <strong>OCR 處理中 ({{ scanProgress.current }} / {{ scanProgress.total }})</strong>
             </div>
-            <strong>OCR 處理中 ({{ scanProgress.current }} / {{ scanProgress.total }})</strong>
+            <button @click="cancelScan" class="btn" style="padding: 4px 8px; font-size: 0.8rem; background: #fee2e2; color: #dc2626; border: none; border-radius: 4px; cursor: pointer;">
+              終止掃描
+            </button>
           </div>
           <div class="ocr-progress-body">
             <p class="current-file">正在掃描: <span>{{ scanProgress.currentFilename }}</span></p>
@@ -220,7 +225,8 @@ export default {
       scanResult: null,
       showConfirmDialog: false,
       newFilesInfo: null,
-      scanProgress: null
+      scanProgress: null,
+      scanProgressId: null
     }
   },
   computed: {
@@ -246,6 +252,11 @@ export default {
   },
   mounted() {
     this.fetchDocuments()
+    this.checkProgress()
+    this.scanProgressId = setInterval(this.checkProgress, 2000)
+  },
+  unmounted() {
+    if (this.scanProgressId) clearInterval(this.scanProgressId)
   },
   methods: {
     async fetchDocuments() {
@@ -340,6 +351,49 @@ export default {
       }
     },
     
+    async checkProgress() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/ocr/progress`)
+        const data = await response.json()
+        
+        if (data.is_scanning) {
+          // 如果後端正在掃描，同步前台狀態
+          if (!this.scanning) this.scanning = true
+          this.scanProgress = {
+            current: data.progress.current,
+            total: data.progress.total,
+            currentFilename: data.progress.current_file
+          }
+        } else if (this.scanning) {
+          // 原本在掃描，現在後端回報停止，代表完成
+          this.scanning = false
+          this.scanProgress = null
+          this.scanResult = {
+            type: 'success',
+            message: '背景 OCR 處理已全部完成！'
+          }
+          await this.fetchDocuments()
+        } else {
+          // 沒在掃描
+          this.scanning = false
+          this.scanProgress = null
+        }
+      } catch (err) {
+        console.error('Error fetching progress:', err)
+      }
+    },
+
+    async cancelScan() {
+      try {
+        await fetch(`${API_BASE_URL}/api/ocr/cancel_scan`, { method: 'POST' })
+        if (this.scanProgress) {
+          this.scanProgress.currentFilename = "正在停止任務中..."
+        }
+      } catch (err) {
+        console.error('Error cancelling scan:', err)
+      }
+    },
+
     async confirmAndProcess() {
       // 關閉對話框
       this.showConfirmDialog = false
@@ -347,61 +401,38 @@ export default {
       this.scanResult = null
       
       const filesToProcess = this.newFilesInfo.new_files || []
-      const total = filesToProcess.length
-      
-      this.scanProgress = {
-        current: 0,
-        total: total,
-        currentFilename: ''
-      }
-      
-      let processed = 0
-      let skipped = 0
-      let failed = 0
+      const filenames = filesToProcess.map(f => f.filename)
       
       try {
-        // 逐個檔案進行 OCR，讓前端不被阻擋並且能顯示進度
-        for (let i = 0; i < total; i++) {
-          const file = filesToProcess[i]
-          this.scanProgress.current = i + 1
-          this.scanProgress.currentFilename = file.filename
-          
-          const response = await fetch(`${API_BASE_URL}/api/ocr/scan_file`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ filename: file.filename })
-          })
-          
-          const data = await response.json()
-          
-          if (data.success && data.data.status === 'success') {
-            processed++
-          } else if (data.success && data.data.status === 'skipped') {
-            skipped++
-          } else {
-            failed++
-          }
-          
-          // 每處理完一個檔案就更新一次搜尋列表，讓使用者能邊等邊查
-          await this.fetchDocuments()
-        }
+        // 通知後端開始背景掃描
+        const response = await fetch(`${API_BASE_URL}/api/ocr/start_scan`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ files: filenames })
+        })
         
-        this.scanResult = {
-          type: processed > 0 ? 'success' : 'info',
-          message: processed > 0 ? `成功處理 ${processed} 個新檔案！` : '沒有檔案被處理',
-          details: { processed, skipped, failed, total }
+        const data = await response.json()
+        
+        if (data.success) {
+          // 立刻呼叫一次 checkProgress 以更新畫面，之後就交給 setInterval
+          this.checkProgress()
+        } else {
+          this.scanResult = {
+            type: 'error',
+            message: data.message || '啟動掃描失敗，可能已經有任務在進行中'
+          }
+          this.scanning = false
         }
       } catch (err) {
         this.scanResult = {
           type: 'error',
-          message: '處理時發生錯誤: ' + err.message
+          message: '請求處理時發生錯誤: ' + err.message
         }
         console.error('Error processing:', err)
-      } finally {
         this.scanning = false
-        this.scanProgress = null
+      } finally {
         this.newFilesInfo = null
       }
     },

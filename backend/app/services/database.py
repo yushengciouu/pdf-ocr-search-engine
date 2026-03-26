@@ -26,8 +26,10 @@ class DatabaseService:
         self.db_path = Path(__file__).parent.parent.parent.parent / "fuyu.sqlite"
         
     def get_connection(self) -> sqlite3.Connection:
-        """取得資料庫連線"""
-        return sqlite3.connect(str(self.db_path))
+        """取得資料庫連線並開啟 WAL 模式提升並發效能"""
+        conn = sqlite3.connect(str(self.db_path), timeout=10.0)
+        conn.execute('PRAGMA journal_mode=WAL;')
+        return conn
     
     def list_all_documents(self) -> List[Dict]:
         """

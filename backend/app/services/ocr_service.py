@@ -7,6 +7,7 @@ import os
 import glob
 import sqlite3
 import numpy as np
+import threading
 from pathlib import Path
 from typing import List, Dict
 from paddleocr import PaddleOCR
@@ -21,6 +22,56 @@ class OCRService:
         self.ocr = None  # 延遲初始化，避免啟動時載入
         self.db_path = Path(__file__).parent.parent.parent.parent / "fuyu.sqlite"
         self.factory_path = Path(__file__).parent.parent.parent.parent / "factory"
+        self.is_scanning = False
+        self.cancel_requested = False
+        self.scan_progress = {"current": 0, "total": 0, "current_file": ""}
+
+    def get_progress(self) -> Dict:
+        """取得目前背景掃描進度"""
+        return {
+            "is_scanning": self.is_scanning,
+            "progress": self.scan_progress
+        }
+
+    def cancel_scan(self):
+        """請求終止背景掃描"""
+        if self.is_scanning:
+            self.cancel_requested = True
+
+    def start_background_scan(self, filenames: List[str]) -> bool:
+        """開始在背景執行緒中掃描多個檔案"""
+        if self.is_scanning:
+            return False
+            
+        self.is_scanning = True
+        self.cancel_requested = False
+        self.scan_progress = {
+            "current": 0,
+            "total": len(filenames),
+            "current_file": ""
+        }
+        
+        def run_scan():
+            try:
+                for i, filename in enumerate(filenames):
+                    if self.cancel_requested:
+                        break
+                        
+                    self.scan_progress["current"] = i + 1
+                    self.scan_progress["current_file"] = filename
+                    try:
+                        self.scan_single_file(filename)
+                    except Exception as e:
+                        print(f"Error scanning {filename}: {e}")
+            finally:
+                self.is_scanning = False
+                self.cancel_requested = False
+                
+        thread = threading.Thread(target=run_scan)
+        thread.daemon = True
+        thread.start()
+        
+        return True
 
     def _get_ocr(self):
         """取得 OCR 實例（延遲初始化）"""
@@ -43,6 +94,9 @@ class OCRService:
 
         page_results = []
         for page_num, image in enumerate(images, start=1):
+            if hasattr(self, 'cancel_requested') and self.cancel_requested:
+                raise Exception("任務已被強制中斷")
+                
             result = ocr.predict(np.array(image))
             if result and len(result) > 0:
                 page_text = "\n".join(result[0]["rec_texts"])
