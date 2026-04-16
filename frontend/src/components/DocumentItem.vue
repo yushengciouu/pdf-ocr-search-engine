@@ -1,6 +1,9 @@
 <template>
-  <div class="document-item fade-in">
+  <div class="document-item fade-in" @click="$emit('toggle-select')">
     <div class="document-content">
+      <div v-if="selected !== undefined" class="document-checkbox" @click.stop="$emit('toggle-select')">
+        <input type="checkbox" :checked="selected" readonly />
+      </div>
       <div class="document-icon">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -76,6 +79,10 @@ export default {
     document: {
       type: Object,
       required: true
+    },
+    selected: {
+      type: Boolean,
+      default: undefined
     }
   },
   computed: {
@@ -159,6 +166,21 @@ export default {
   display: flex;
   gap: var(--spacing-md);
   align-items: flex-start;
+  cursor: pointer;
+}
+
+.document-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.document-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
 }
 
 .document-icon {

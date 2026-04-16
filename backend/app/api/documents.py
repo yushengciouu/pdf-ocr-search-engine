@@ -3,13 +3,21 @@
 """
 
 from pathlib import Path
+import io
+from typing import List
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel
+import pypdf
+
 from ..services.database import DatabaseService
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 db_service = DatabaseService()
+
+class PrintMergeRequest(BaseModel):
+    doc_ids: List[int]
 
 
 @router.get("")
@@ -131,3 +139,49 @@ async def delete_document(doc_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/print_merge")
+async def print_merge(request: PrintMergeRequest):
+    """
+    將多份 PDF 檔案合併為一份，以便於前端列印
+    """
+    try:
+        if not request.doc_ids:
+            raise HTTPException(status_code=400, detail="未提供任何文件 ID")
+
+        merger = pypdf.PdfWriter()
+        
+        for doc_id in request.doc_ids:
+            document = db_service.get_document_by_id(doc_id)
+            if not document:
+                continue
+
+            pdf_path = Path(document["filepath"])
+            if not pdf_path.exists() or not pdf_path.is_file():
+                # 跨平台相容處理
+                factory_path = Path(__file__).parent.parent.parent.parent / "factory"
+                pdf_path = factory_path / document["filename"]
+
+            if pdf_path.exists() and pdf_path.is_file():
+                merger.append(str(pdf_path))
+
+        if len(merger.pages) == 0:
+            raise HTTPException(status_code=404, detail="找不到有效的 PDF 檔案進行合併")
+
+        output_pdf_stream = io.BytesIO()
+        merger.write(output_pdf_stream)
+        merger.close()
+        
+        output_pdf_stream.seek(0)
+
+        return StreamingResponse(
+            output_pdf_stream, 
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "inline; filename*=UTF-8''merged_for_print.pdf"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"合併 PDF 時發生錯誤: {str(e)}")

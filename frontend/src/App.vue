@@ -159,45 +159,44 @@
         <!-- 搜尋結果 -->
         <div v-else-if="searchResults.length > 0">
           <div class="results-header">
-            <h2>搜尋結果</h2>
-            <span class="results-count">找到 {{ groupedSearchResults.length }} 份文件 ({{ searchResults.length }} 頁)</span>
+            <div>
+              <h2>搜尋結果</h2>
+              <span class="results-count">找到 {{ groupedSearchResults.length }} 份文件 ({{ searchResults.length }} 頁)</span>
+            </div>
+            
+            <div class="results-actions" v-if="selectedDocs.length > 0">
+              <button @click="printSelected" class="btn btn-primary btn-print" :disabled="isPrinting">
+                <svg v-if="!isPrinting" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                <svg v-else class="loading" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" width="18" height="18">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {{ isPrinting ? '處理列印中...' : `列印已選取 (${selectedDocs.length})` }}
+              </button>
+            </div>
           </div>
           <div class="documents-list">
             <DocumentItem
               v-for="group in groupedSearchResults"
               :key="`search-group-${group.doc_id}`"
               :document="group"
+              :selected="selectedDocs.includes(group.doc_id)"
+              @toggle-select="toggleDocumentSelection(group.doc_id)"
             />
           </div>
         </div>
 
-        <!-- 所有文件列表 -->
-        <div v-else-if="documents.length > 0">
-          <div class="results-header">
-            <h2>所有文件</h2>
-            <span class="results-count">共 {{ totalDocuments }} 份文件</span>
-          </div>
-          <div class="documents-list">
-            <DocumentItem
-              v-for="doc in documents"
-              :key="`doc-${doc.id}`"
-              :document="doc"
-            />
-          </div>
-          <div v-if="hasMore" class="load-more-container">
-            <button @click="loadMore" class="btn btn-secondary" :disabled="loadingMore">
-              {{ loadingMore ? '載入中...' : '載入更多' }}
-            </button>
-          </div>
-        </div>
+
 
         <!-- 空狀態 -->
         <div v-else class="empty-state">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <h3>尚無文件</h3>
-          <p>點擊「掃描資料夾」按鈕來處理 PDF 文件</p>
+          <h3>請輸入關鍵字搜尋文件</h3>
+          <p>或是點擊右上角掃描新資料夾</p>
         </div>
       </div>
     </main>
@@ -234,7 +233,9 @@ export default {
       showConfirmDialog: false,
       newFilesInfo: null,
       scanProgress: null,
-      scanProgressId: null
+      scanProgressId: null,
+      selectedDocs: [],
+      isPrinting: false
     }
   },
   computed: {
@@ -259,7 +260,6 @@ export default {
     }
   },
   mounted() {
-    this.fetchDocuments()
     this.checkProgress()
     this.scanProgressId = setInterval(this.checkProgress, 2000)
   },
@@ -329,7 +329,75 @@ export default {
     
     handleClear() {
       this.searchResults = []
-      this.fetchDocuments()
+      this.selectedDocs = []
+    },
+    
+    toggleDocumentSelection(docId) {
+      if (this.selectedDocs.includes(docId)) {
+        this.selectedDocs = this.selectedDocs.filter(id => id !== docId)
+      } else {
+        this.selectedDocs.push(docId)
+      }
+    },
+
+    async printSelected() {
+      if (this.selectedDocs.length === 0) return;
+      
+      this.isPrinting = true;
+      // 先開分頁避免被瀏覽器當成廣告攔截
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>準備合併檔案...</title><style>body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #f3f4f6; color: #4f46e5; font-size: 1.2rem; }</style></head><body>正在合併文件，請稍候...</body></html>`);
+      } else {
+        alert("您的瀏覽器封鎖了彈出視窗，這可能導致無法開啟列印頁面。");
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/documents/print_merge`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ doc_ids: this.selectedDocs })
+        });
+
+        if (!response.ok) {
+          throw new Error('無法合併產生 PDF 檔案');
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        
+        if (win) {
+          // 將 PDF 塞進新分頁的 embed 中
+          win.document.open();
+          win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>合併列印檔案</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #525659; overflow: hidden; }
+    embed { display: block; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <embed src="${url}#toolbar=1&navpanes=0&scrollbar=0" type="application/pdf" width="100%" height="100%" />
+</body>
+</html>`);
+          win.document.close();
+        } else {
+          // 若被擋，改為直接跳轉
+          window.location.href = url;
+        }
+        
+      } catch (err) {
+        if (win) win.close();
+        alert(err.message);
+      } finally {
+        this.isPrinting = false;
+      }
     },
     
     async scanFolder() {
@@ -577,6 +645,33 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--spacing-lg);
+}
+
+.results-header > div {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.results-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.btn-print {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--color-primary);
+  color: white;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2), 0 2px 4px -1px rgba(99, 102, 241, 0.1);
+}
+
+.btn-print:hover {
+  background-color: var(--color-primary-dark);
 }
 
 .results-header h2 {
