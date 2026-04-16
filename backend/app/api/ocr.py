@@ -1,6 +1,8 @@
 """
 OCR 相關的 API 路由
 """
+import sys
+import subprocess
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List
@@ -10,23 +12,47 @@ router = APIRouter(prefix="/api/ocr", tags=["ocr"])
 ocr_service = OCRService()
 
 class ScanFileRequest(BaseModel):
-    filename: str
+    filepath: str
 
 class StartScanRequest(BaseModel):
-    files: List[str]
+    filepaths: List[str]
+
+
+@router.get("/select_folder")
+def select_folder():
+    """開啟伺服器端的資料夾選擇對話框"""
+    try:
+        cmd = [
+            sys.executable, "-c",
+            "import sys, tkinter as tk, tkinter.filedialog as fd; "
+            "root = tk.Tk(); root.attributes('-topmost', True); root.withdraw(); "
+            "path = fd.askdirectory(title='請選擇要掃描的 PDF 資料夾'); "
+            "print(path)"
+        ]
+        
+        # 使用 subprocess 來避免 tkinter 在 FastAPI 的 threadpool 內導致 UI 卡住或當機
+        result = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
+        folder_path = result.strip()
+        
+        if folder_path:
+            return {"success": True, "folder_path": folder_path}
+        else:
+            return {"success": False, "message": "已取消選擇"}
+    except Exception as e:
+        return {"success": False, "message": f"無法開啟資料夾選擇視窗: {str(e)}"}
 
 
 @router.get("/check")
-def check_new_files():
+def check_new_files(folder_path: str = None):
     """
-    檢查 factory 資料夾中有哪些新的 PDF 檔案需要處理
+    檢查指定資料夾中有哪些新的 PDF 檔案需要處理
     (不執行 OCR，只返回檔案資訊)
     
     Returns:
         新檔案的數量和詳細資訊
     """
     try:
-        result = ocr_service.check_new_files()
+        result = ocr_service.check_new_files(folder_path)
         return {
             "success": True,
             "data": result
@@ -58,7 +84,7 @@ def scan_single_file(request: ScanFileRequest):
     掃描單一 PDF 檔案
     """
     try:
-        result = ocr_service.scan_single_file(request.filename)
+        result = ocr_service.scan_single_file(request.filepath)
         return {
             "success": result["success"],
             "data": result
@@ -69,7 +95,7 @@ def scan_single_file(request: ScanFileRequest):
 @router.post("/start_scan")
 def start_scan(request: StartScanRequest):
     """開始背景掃描多個檔案"""
-    success = ocr_service.start_background_scan(request.files)
+    success = ocr_service.start_background_scan(request.filepaths)
     if not success:
         return {"success": False, "message": "掃描正在進行中"}
     return {"success": True}

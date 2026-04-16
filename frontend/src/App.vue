@@ -333,12 +333,45 @@ export default {
     },
     
     async scanFolder() {
+      // 先向後端請求開啟資料夾選擇對話框
       this.scanning = true
-      this.scanResult = null
+      this.scanResult = {
+        type: 'info',
+        message: '正在開啟資料夾選擇視窗，請在伺服器端畫面選擇路徑...'
+      }
+      
+      let targetPath = '';
+      try {
+        const pickerResponse = await fetch(`${API_BASE_URL}/api/ocr/select_folder`);
+        const pickerData = await pickerResponse.json();
+        
+        if (!pickerData.success || !pickerData.folder_path) {
+          this.scanning = false;
+          this.scanResult = {
+            type: 'warning',
+            message: pickerData.message || '已取消選擇資料夾'
+          };
+          return;
+        }
+        
+        targetPath = pickerData.folder_path;
+      } catch (err) {
+        this.scanning = false;
+        this.scanResult = {
+          type: 'error',
+          message: '無法開啟資料夾選擇器: ' + err.message
+        };
+        return;
+      }
+
+      this.scanResult = {
+        type: 'info',
+        message: '正在讀取資料夾並計算檔案數量中，這可能需要一點時間，請耐心等候...'
+      }
       
       try {
         // 第一步：檢查新檔案
-        const checkResponse = await fetch(`${API_BASE_URL}/api/ocr/check`)
+        const checkResponse = await fetch(`${API_BASE_URL}/api/ocr/check?folder_path=${encodeURIComponent(targetPath)}`)
         const checkData = await checkResponse.json()
         
         if (checkData.success) {
@@ -426,7 +459,7 @@ export default {
       this.scanResult = null
       
       const filesToProcess = this.newFilesInfo.new_files || []
-      const filenames = filesToProcess.map(f => f.filename)
+      const filepaths = filesToProcess.map(f => f.filepath)
       
       try {
         // 通知後端開始背景掃描
@@ -435,7 +468,7 @@ export default {
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ files: filenames })
+          body: JSON.stringify({ filepaths: filepaths })
         })
         
         const data = await response.json()

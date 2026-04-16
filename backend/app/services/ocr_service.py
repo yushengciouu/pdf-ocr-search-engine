@@ -38,7 +38,7 @@ class OCRService:
         if self.is_scanning:
             self.cancel_requested = True
 
-    def start_background_scan(self, filenames: List[str]) -> bool:
+    def start_background_scan(self, filepaths: List[str]) -> bool:
         """開始在背景執行緒中掃描多個檔案"""
         if self.is_scanning:
             return False
@@ -47,22 +47,23 @@ class OCRService:
         self.cancel_requested = False
         self.scan_progress = {
             "current": 0,
-            "total": len(filenames),
+            "total": len(filepaths),
             "current_file": ""
         }
         
         def run_scan():
             try:
-                for i, filename in enumerate(filenames):
+                for i, filepath in enumerate(filepaths):
                     if self.cancel_requested:
                         break
                         
+                    p = Path(filepath)
                     self.scan_progress["current"] = i + 1
-                    self.scan_progress["current_file"] = filename
+                    self.scan_progress["current_file"] = p.name
                     try:
-                        self.scan_single_file(filename)
+                        self.scan_single_file(filepath)
                     except Exception as e:
-                        print(f"Error scanning {filename}: {e}")
+                        print(f"Error scanning {filepath}: {e}")
             finally:
                 self.is_scanning = False
                 self.cancel_requested = False
@@ -179,19 +180,21 @@ class OCRService:
         finally:
             conn.close()
 
-    def check_new_files(self) -> Dict:
+    def check_new_files(self, folder_path: str = None) -> Dict:
         """
-        檢查 factory 資料夾中有哪些新的 PDF 檔案需要處理
+        檢查指定資料夾中有哪些新的 PDF 檔案需要處理
         (不執行 OCR，只返回檔案資訊)
 
         Returns:
             新檔案的數量和詳細資訊
         """
-        if not self.factory_path.exists():
-            raise Exception(f"資料夾不存在: {self.factory_path}")
+        target_path = Path(folder_path) if folder_path else self.factory_path
+        
+        if not target_path.exists() or not target_path.is_dir():
+            raise Exception(f"資料夾不存在或無效: {target_path}")
 
         # 取得所有 PDF 檔案
-        pdf_files = list(self.factory_path.glob("*.pdf"))
+        pdf_files = list(target_path.glob("*.pdf"))
 
         new_files = []
         for pdf_path in pdf_files:
@@ -283,24 +286,21 @@ class OCRService:
             "details": details,
         }
 
-    def scan_single_file(self, filename: str) -> Dict:
+    def scan_single_file(self, filepath: str) -> Dict:
         """
         掃描單一 PDF 檔案
         
         Args:
-            filename: 檔案名稱
+            filepath: 檔案路徑
             
         Returns:
             處理結果
         """
-        if not self.factory_path.exists():
-            raise Exception(f"資料夾不存在: {self.factory_path}")
-            
-        pdf_path = self.factory_path / filename
+        pdf_path = Path(filepath)
         if not pdf_path.exists() or not pdf_path.is_file():
-            raise Exception(f"檔案不存在: {filename}")
+            raise Exception(f"檔案不存在: {filepath}")
             
-        filepath = str(pdf_path.absolute())
+        filename = pdf_path.name
         
         # 檢查是否已在資料庫
         if self.is_file_in_db(filename):
