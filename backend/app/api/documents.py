@@ -13,16 +13,36 @@ db_service = DatabaseService()
 
 
 @router.get("")
-async def list_documents():
+async def list_documents(page: int = 1, limit: int = 20):
     """
-    列出所有文件
+    分頁列出文件
+
+    Args:
+        page: 頁碼，從 1 開始
+        limit: 每頁顯示數量
 
     Returns:
-        所有文件的列表
+        包含文件列表及分頁資訊的回傳結果
     """
     try:
-        documents = db_service.list_all_documents()
-        return {"success": True, "count": len(documents), "data": documents}
+        if page < 1:
+            page = 1
+        if limit < 1:
+            limit = 20
+        offset = (page - 1) * limit
+        total_count = db_service.get_total_documents_count()
+        documents = db_service.list_documents_paginated(limit=limit, offset=offset)
+        total_pages = (total_count + limit - 1) // limit
+        
+        return {
+            "success": True, 
+            "count": len(documents),
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "current_page": page,
+            "limit": limit,
+            "data": documents
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -64,6 +64,57 @@ class DatabaseService:
             raise Exception(f"查詢文件時發生錯誤: {str(e)}")
         finally:
             conn.close()
+
+    def get_total_documents_count(self) -> int:
+        """取得文件總數"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT COUNT(*) FROM documents')
+            return cursor.fetchone()[0]
+        except Exception as e:
+            raise Exception(f"取得文件總數時發生錯誤: {str(e)}")
+        finally:
+            conn.close()
+
+    def list_documents_paginated(self, limit: int = 20, offset: int = 0) -> List[Dict]:
+        """
+        分頁列出文件
+        
+        Args:
+            limit: 最大回傳數量
+            offset: 位移量
+            
+        Returns:
+            文件列表
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT id, filename, filepath, upload_date
+                FROM documents
+                ORDER BY upload_date DESC
+                LIMIT ? OFFSET ?
+            ''', (limit, offset))
+            results = cursor.fetchall()
+            
+            documents = []
+            for row in results:
+                documents.append({
+                    "id": row[0],
+                    "filename": row[1],
+                    "filepath": row[2],
+                    "upload_date": row[3]
+                })
+            
+            return documents
+            
+        except Exception as e:
+            raise Exception(f"查詢文件時發生錯誤: {str(e)}")
+        finally:
+            conn.close()
     
     def search_documents(self, keyword: str) -> List[Dict]:
         """

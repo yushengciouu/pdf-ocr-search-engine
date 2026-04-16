@@ -175,7 +175,7 @@
         <div v-else-if="documents.length > 0">
           <div class="results-header">
             <h2>所有文件</h2>
-            <span class="results-count">共 {{ documents.length }} 份文件</span>
+            <span class="results-count">共 {{ totalDocuments }} 份文件</span>
           </div>
           <div class="documents-list">
             <DocumentItem
@@ -183,6 +183,11 @@
               :key="`doc-${doc.id}`"
               :document="doc"
             />
+          </div>
+          <div v-if="hasMore" class="load-more-container">
+            <button @click="loadMore" class="btn btn-secondary" :disabled="loadingMore">
+              {{ loadingMore ? '載入中...' : '載入更多' }}
+            </button>
           </div>
         </div>
 
@@ -219,9 +224,12 @@ export default {
       documents: [],
       searchResults: [],
       loading: false,
+      loadingMore: false,
       scanning: false,
       error: null,
       totalDocuments: 0,
+      currentPage: 1,
+      hasMore: false,
       scanResult: null,
       showConfirmDialog: false,
       newFilesInfo: null,
@@ -259,25 +267,42 @@ export default {
     if (this.scanProgressId) clearInterval(this.scanProgressId)
   },
   methods: {
-    async fetchDocuments() {
-      this.loading = true
+    async fetchDocuments(page = 1) {
+      if (page === 1) {
+        this.loading = true
+      } else {
+        this.loadingMore = true
+      }
       this.error = null
       
       try {
-        const response = await fetch(`${API_BASE_URL}/api/documents`)
+        const response = await fetch(`${API_BASE_URL}/api/documents?page=${page}&limit=20`)
         const data = await response.json()
         
         if (data.success) {
-          this.documents = data.data
-          this.totalDocuments = data.count
+          if (page === 1) {
+            this.documents = data.data
+          } else {
+            this.documents = [...this.documents, ...data.data]
+          }
+          this.totalDocuments = data.total_count
+          this.currentPage = data.current_page
+          this.hasMore = data.current_page < data.total_pages
         } else {
-          this.error = '無法載入文件列表'
+          if (page === 1) this.error = '無法載入文件列表'
         }
       } catch (err) {
-        this.error = '連線失敗，請確認後端伺服器是否運行'
+        if (page === 1) this.error = '連線失敗，請確認後端伺服器是否運行'
         console.error('Error fetching documents:', err)
       } finally {
         this.loading = false
+        this.loadingMore = false
+      }
+    },
+    
+    loadMore() {
+      if (this.hasMore && !this.loadingMore) {
+        this.fetchDocuments(this.currentPage + 1)
       }
     },
     
@@ -539,6 +564,12 @@ export default {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+}
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--spacing-xl);
 }
 
 .scan-result {
