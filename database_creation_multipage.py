@@ -15,6 +15,7 @@ def initialize_database():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         filename TEXT NOT NULL,       -- 例如：test2.pdf
         filepath TEXT NOT NULL,       -- 例如：D:/data/test2.pdf
+        doc_date TEXT DEFAULT NULL,   -- 擷取的日期 (YYYY-MM-DD)
         upload_date TEXT DEFAULT CURRENT_TIMESTAMP
     )
     ''')

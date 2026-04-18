@@ -6,6 +6,7 @@ OCR 服務層
 import os
 import glob
 import sqlite3
+import re
 import numpy as np
 import threading
 from pathlib import Path
@@ -150,13 +151,22 @@ class OCRService:
         cursor = conn.cursor()
 
         try:
+            # 嘗試從檔名中萃取出 YYYYMMDD 的日期 (例如: 20250207)
+            # 尋找前後帶有連字號的 8 位數字: -20250207-
+            doc_date = None
+            date_match = re.search(r'-(20[2-9]\d{5})-?', filename)
+            if date_match:
+                raw_date = date_match.group(1)
+                # 轉成 YYYY-MM-DD 格式
+                doc_date = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
+        
             # 1. 插入 documents 表
             cursor.execute(
                 """
-                INSERT INTO documents (filename, filepath)
-                VALUES (?, ?)
+                INSERT INTO documents (filename, filepath, doc_date)
+                VALUES (?, ?, ?)
             """,
-                (filename, filepath),
+                (filename, filepath, doc_date),
             )
 
             doc_id = cursor.lastrowid

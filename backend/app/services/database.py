@@ -43,7 +43,7 @@ class DatabaseService:
         
         try:
             cursor.execute('''
-                SELECT id, filename, filepath, upload_date
+                SELECT id, filename, filepath, doc_date, upload_date
                 FROM documents
                 ORDER BY upload_date DESC
             ''')
@@ -55,7 +55,8 @@ class DatabaseService:
                     "id": row[0],
                     "filename": row[1],
                     "filepath": row[2],
-                    "upload_date": row[3]
+                    "doc_date": row[3],
+                    "upload_date": row[4]
                 })
             
             return documents
@@ -93,7 +94,7 @@ class DatabaseService:
         
         try:
             cursor.execute('''
-                SELECT id, filename, filepath, upload_date
+                SELECT id, filename, filepath, doc_date, upload_date
                 FROM documents
                 ORDER BY upload_date DESC
                 LIMIT ? OFFSET ?
@@ -106,7 +107,8 @@ class DatabaseService:
                     "id": row[0],
                     "filename": row[1],
                     "filepath": row[2],
-                    "upload_date": row[3]
+                    "doc_date": row[3],
+                    "upload_date": row[4]
                 })
             
             return documents
@@ -116,7 +118,7 @@ class DatabaseService:
         finally:
             conn.close()
     
-    def search_documents(self, keyword: str) -> List[Dict]:
+    def search_documents(self, keyword: str, start_date: str = None, end_date: str = None) -> List[Dict]:
         """
         搜尋包含關鍵字的文件
         
@@ -134,30 +136,39 @@ class DatabaseService:
             special_chars = ['-', '"', '(', ')', '*', ':', '^']
             has_special_char = any(char in keyword for char in special_chars)
             
+            date_filter = ""
+            date_params = []
+            if start_date:
+                date_filter += " AND d.doc_date >= ?"
+                date_params.append(start_date)
+            if end_date:
+                date_filter += " AND d.doc_date <= ?"
+                date_params.append(end_date)
+            
             # 如果關鍵字太短或包含特殊字元，使用 LIKE 查詢
             if len(keyword) < 3 or has_special_char:
                 # 使用 LIKE 查詢支援短關鍵字和特殊字元
-                query = '''
+                query = f'''
                     SELECT f.doc_id, d.filename, d.filepath, f.page_number, 
-                        substr(f.content, max(1, instr(f.content, ?) - 50), 150) as snippet
+                        substr(f.content, max(1, instr(f.content, ?) - 50), 150) as snippet, d.doc_date
                     FROM doc_fts f
                     JOIN documents d ON f.doc_id = d.id
-                    WHERE f.content LIKE ?
+                    WHERE f.content LIKE ?{date_filter}
                 '''
-                params = (keyword, f'%{keyword}%')
+                params = [keyword, f'%{keyword}%'] + date_params
             else:
                 # 使用 FTS5 MATCH 查詢（更快，支援 trigram）
-                query = '''
+                query = f'''
                     SELECT f.doc_id, d.filename, d.filepath, f.page_number,
-                        snippet(doc_fts, 0, '<b>', '</b>', '...', 10) as snippet
+                        snippet(doc_fts, 0, '<b>', '</b>', '...', 10) as snippet, d.doc_date
                     FROM doc_fts f
                     JOIN documents d ON f.doc_id = d.id
-                    WHERE doc_fts MATCH ?
+                    WHERE doc_fts MATCH ?{date_filter}
                     ORDER BY rank
                 '''
-                params = (keyword,)
+                params = [keyword] + date_params
             
-            cursor.execute(query, params)
+            cursor.execute(query, tuple(params))
             results = cursor.fetchall()
             
             search_results = []
@@ -177,7 +188,8 @@ class DatabaseService:
                     "filename": row[1],
                     "filepath": row[2],
                     "page_number": row[3],
-                    "snippet": snippet_text
+                    "snippet": snippet_text,
+                    "doc_date": row[5]
                 })
             
             return search_results
@@ -202,7 +214,7 @@ class DatabaseService:
         
         try:
             cursor.execute('''
-                SELECT id, filename, filepath, upload_date
+                SELECT id, filename, filepath, doc_date, upload_date
                 FROM documents
                 WHERE id = ?
             ''', (doc_id,))
@@ -213,7 +225,8 @@ class DatabaseService:
                     "id": row[0],
                     "filename": row[1],
                     "filepath": row[2],
-                    "upload_date": row[3]
+                    "doc_date": row[3],
+                    "upload_date": row[4]
                 }
             return None
             

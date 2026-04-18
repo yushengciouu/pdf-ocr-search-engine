@@ -18,6 +18,17 @@
         </svg>
       </span>
     </div>
+    
+    <div class="date-filters">
+      <div class="date-input-group">
+        <label>開始日期：</label>
+        <input type="date" v-model="startDate" @change="onSearch" class="date-input" />
+      </div>
+      <div class="date-input-group">
+        <label>結束日期：</label>
+        <input type="date" v-model="endDate" @change="onSearch" class="date-input" />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -27,6 +38,8 @@ export default {
   data() {
     return {
       searchQuery: '',
+      startDate: '',
+      endDate: '',
       isSearching: false,
       searchTimeout: null
     }
@@ -41,7 +54,11 @@ export default {
       // 延遲搜尋（防抖）
       this.searchTimeout = setTimeout(() => {
         if (this.searchQuery.trim()) {
-          this.$emit('search', this.searchQuery.trim())
+          this.$emit('search', {
+            keyword: this.searchQuery.trim(),
+            startDate: this.startDate || undefined,
+            endDate: this.endDate || undefined
+          })
         } else {
           this.$emit('clear')
         }
@@ -61,6 +78,46 @@ export default {
   position: relative;
   display: flex;
   align-items: center;
+}
+
+.date-filters {
+  display: flex;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-sm);
+  padding: 0 1rem;
+}
+
+.date-input-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.date-input {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  transition: all var(--transition-normal);
+  color-scheme: dark; /* 讓行事曆視窗本身呈現暗色主題 */
+}
+
+/* 確保不論瀏覽器原生日曆圖示是什麼顏色，強制洗成全黑再反轉為全白 */
+.date-input::-webkit-calendar-picker-indicator {
+  filter: brightness(0) invert(1) opacity(0.7);
+  cursor: pointer;
+}
+.date-input::-webkit-calendar-picker-indicator:hover {
+  filter: brightness(0) invert(1) opacity(1);
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 .search-icon {

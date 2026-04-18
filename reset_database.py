@@ -65,6 +65,7 @@ def reset_database():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         filename TEXT NOT NULL,
         filepath TEXT NOT NULL,
+        doc_date TEXT DEFAULT NULL,
         upload_date TEXT DEFAULT CURRENT_TIMESTAMP
     )
     ''')

@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 import pypdf
+import urllib.parse
 
 from ..services.database import DatabaseService
 
@@ -109,7 +110,7 @@ async def get_document_pdf(doc_id: int):
             path=str(pdf_path),
             media_type="application/pdf",
             headers={
-                "Content-Disposition": f"inline; filename*=UTF-8''{document['filename']}"
+                "Content-Disposition": f"inline; filename*=UTF-8''{urllib.parse.quote(document['filename'])}"
             },
         )
     except HTTPException:

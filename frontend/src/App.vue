@@ -306,12 +306,27 @@ export default {
       }
     },
     
-    async handleSearch(keyword) {
+    async handleSearch(payload) {
       this.loading = true
       this.error = null
+      this.selectedDocs = [] // 清除前次搜尋的勾選狀態
+      
+      // 相容舊的字串傳入或新的物件傳入
+      let keyword = '';
+      let url = `${API_BASE_URL}/api/search`;
+      
+      if (typeof payload === 'string') {
+        keyword = payload;
+        url += `?q=${encodeURIComponent(keyword)}`;
+      } else {
+        keyword = payload.keyword;
+        url += `?q=${encodeURIComponent(keyword)}`;
+        if (payload.startDate) url += `&start_date=${encodeURIComponent(payload.startDate)}`;
+        if (payload.endDate)   url += `&end_date=${encodeURIComponent(payload.endDate)}`;
+      }
       
       try {
-        const response = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(keyword)}`)
+        const response = await fetch(url)
         const data = await response.json()
         
         if (data.success) {
