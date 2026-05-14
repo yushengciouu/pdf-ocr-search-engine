@@ -6,11 +6,13 @@ import sqlite3
 from typing import List, Dict, Optional
 from pathlib import Path
 
+from ..paths import get_database_path
+
 
 class DatabaseService:
     """資料庫服務類別"""
     
-    def __init__(self, db_path: str = "../fuyu.sqlite"):
+    def __init__(self, db_path: str = None):
         """
         初始化資料庫服務
         
@@ -23,8 +25,37 @@ class DatabaseService:
         # parent.parent = backend/app
         # parent.parent.parent = backend
         # parent.parent.parent.parent = FUYU (專案根目錄)
-        self.db_path = Path(__file__).parent.parent.parent.parent / "fuyu.sqlite"
+        self.db_path = Path(db_path) if db_path else get_database_path()
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_db()
+
+    def _init_db(self):
+        """如果資料表不存在，則自動建立"""
+        conn = sqlite3.connect(str(self.db_path))
+        cursor = conn.cursor()
         
+        # 1. 建立 documents 表
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            filepath TEXT NOT NULL,
+            doc_date TEXT DEFAULT NULL,
+            upload_date TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+        
+        # 2. 建立 doc_fts 全文檢索表
+        cursor.execute('''
+        CREATE VIRTUAL TABLE IF NOT EXISTS doc_fts USING fts5(
+            content, 
+            doc_id UNINDEXED,
+            page_number UNINDEXED,
+            tokenize='trigram'
+        )
+        ''')
+        conn.commit()
+        conn.close()
     def get_connection(self) -> sqlite3.Connection:
         """取得資料庫連線並開啟 WAL 模式提升並發效能"""
         conn = sqlite3.connect(str(self.db_path), timeout=10.0)

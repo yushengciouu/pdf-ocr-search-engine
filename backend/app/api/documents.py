@@ -12,6 +12,7 @@ from pydantic import BaseModel
 import pypdf
 import urllib.parse
 
+from ..paths import get_factory_path
 from ..services.database import DatabaseService
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -100,7 +101,7 @@ async def get_document_pdf(doc_id: int):
         # 跨平台相容處理：如果絕對路徑 (例如 Windows 路徑在 Docker 內) 找不到檔案，
         # 就嘗試直接從 factory 資料夾尋找該檔名的檔案。
         if not pdf_path.exists() or not pdf_path.is_file():
-            factory_path = Path(__file__).parent.parent.parent.parent / "factory"
+            factory_path = get_factory_path()
             pdf_path = factory_path / document["filename"]
             
         if not pdf_path.exists() or not pdf_path.is_file():
@@ -160,7 +161,7 @@ async def print_merge(request: PrintMergeRequest):
             pdf_path = Path(document["filepath"])
             if not pdf_path.exists() or not pdf_path.is_file():
                 # 跨平台相容處理
-                factory_path = Path(__file__).parent.parent.parent.parent / "factory"
+                factory_path = get_factory_path()
                 pdf_path = factory_path / document["filename"]
 
             if pdf_path.exists() and pdf_path.is_file():

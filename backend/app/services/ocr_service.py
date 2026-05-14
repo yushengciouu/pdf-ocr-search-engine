@@ -14,6 +14,8 @@ from typing import List, Dict
 from paddleocr import PaddleOCR
 from pdf2image import convert_from_path
 
+from ..paths import get_database_path, get_factory_path
+
 
 class OCRService:
     """OCR 服務類別"""
@@ -21,8 +23,8 @@ class OCRService:
     def __init__(self):
         """初始化 OCR 服務"""
         self.ocr = None  # 延遲初始化，避免啟動時載入
-        self.db_path = Path(__file__).parent.parent.parent.parent / "fuyu.sqlite"
-        self.factory_path = Path(__file__).parent.parent.parent.parent / "factory"
+        self.db_path = get_database_path()
+        self.factory_path = get_factory_path()
         self.is_scanning = False
         self.cancel_requested = False
         self.scan_progress = {"current": 0, "total": 0, "current_file": ""}
