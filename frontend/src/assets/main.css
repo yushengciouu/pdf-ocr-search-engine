@@ -5,236 +5,255 @@
   box-sizing: border-box;
 }
 
-/* CSS 變數定義 */
+/* CSS 變數定義 - 暗黑科技與玻璃擬物化風格 (Cyber-Glassmorphism) */
 :root {
-  /* 顏色系統 - 深綠青色系（專業科技感）*/
-  --color-primary: #14b8a6;
-  /* 青綠色 */
-  --color-primary-dark: #0d9488;
-  /* 深青綠 */
-  --color-primary-light: #2dd4bf;
-  /* 亮青綠 */
-  --color-secondary: #06b6d4;
-  /* 天藍色 */
-  --color-accent: #f59e0b;
-  /* 琥珀色（點綴）*/
+  /* 主要色彩 - 螢光青藍系 */
+  --color-primary: #00f2fe;        /* 亮青藍 */
+  --color-primary-dark: #0284c7;   /* 深海藍 */
+  --color-primary-light: #7dd3fc;  /* 淺天藍 */
+  
+  /* 次要色彩 - 霓虹紫/粉點綴 */
+  --color-accent: #c084fc;         /* 霓虹紫 */
+  --color-accent-light: #d8b4fe;   /* 淺柔紫 */
+  
+  /* 功能色彩 */
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
 
-  /* 背景色 */
-  --color-bg-primary: #0a0f1a;
-  /* 深藍黑 */
-  --color-bg-secondary: #111827;
-  /* 深灰藍 */
-  --color-bg-tertiary: #1f2937;
-  /* 中灰藍 */
+  /* 背景色系 - 深邃宇宙色 */
+  --color-bg-base: #030712;        /* 最底層黑 */
+  --color-bg-surface: rgba(17, 24, 39, 0.65); /* 介面層半透明黑 */
+  --color-bg-elevated: rgba(31, 41, 55, 0.7); /* 懸浮層半透明灰 */
+  
+  /* 文字色彩 */
+  --color-text-primary: #f8fafc;   /* 極白 */
+  --color-text-secondary: #cbd5e1; /* 藍灰白 */
+  --color-text-muted: #64748b;     /* 中灰 */
 
-  /* 文字顏色 */
-  --color-text-primary: #f0fdfa;
-  /* 淺青白 */
-  --color-text-secondary: #ccfbf1;
-  /* 淺青綠 */
-  --color-text-muted: #94a3b8;
-  /* 灰藍 */
+  /* 邊框與分割線 */
+  --color-border-glass: rgba(255, 255, 255, 0.08);
+  --color-border-glow: rgba(0, 242, 254, 0.3);
 
-  /* 邊框 */
-  --color-border: #1f2937;
+  /* 面板陰影與發光 */
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(0, 242, 254, 0.15);
+  --shadow-glow-active: 0 0 30px rgba(0, 242, 254, 0.4);
 
-  /* 陰影 */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+  /* 漸層預設 */
+  --gradient-neon: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+  --gradient-accent: linear-gradient(135deg, #c084fc 0%, #a855f7 100%);
+  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  
+  /* 幾何變數 */
+  --spacing-xs: 0.375rem;
+  --spacing-sm: 0.75rem;
+  --spacing-md: 1.25rem;
+  --spacing-lg: 2rem;
+  --spacing-xl: 3rem;
+  --spacing-2xl: 5rem;
 
-  /* 漸層 - 青綠色系 */
-  --gradient-primary: linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%);
-  --gradient-secondary: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);
-  --gradient-accent: linear-gradient(135deg, #2dd4bf 0%, #22d3ee 100%);
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-full: 9999px;
 
-  /* 間距 */
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
-  --spacing-2xl: 3rem;
-
-  /* 圓角 */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-
-  /* 動畫 */
-  --transition-fast: 150ms ease-in-out;
-  --transition-normal: 300ms ease-in-out;
-  --transition-slow: 500ms ease-in-out;
+  /* 過渡動畫時間 */
+  --transition-bounce: 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 150ms ease-out;
 }
 
-/* 全域樣式 */
+/* 全域捲動條 - 時尚隱形感 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 基礎設定 */
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: var(--color-bg-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--color-bg-base);
+  /* 超有質感的動態網格背景 */
+  background-image: 
+    radial-gradient(ellipse at 10% 20%, rgba(0, 242, 254, 0.15) 0%, transparent 40%),
+    radial-gradient(ellipse at 90% 80%, rgba(192, 132, 252, 0.15) 0%, transparent 40%),
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
   color: var(--color-text-primary);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 #app {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* 滾動條樣式 */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--color-bg-secondary);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-md);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
-
-/* 通用工具類 */
+/* 容器 */
 .container {
-  max-width: 1200px;
+  width: 100%;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 0 var(--spacing-lg);
 }
 
-.glass {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+/* 毛玻璃工具類 */
+.glass-panel {
+  background: var(--color-bg-surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-border-glass);
+  box-shadow: var(--shadow-glass);
 }
 
+.glass-pill {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-full);
+}
+
+/* 漸層文字工具 */
 .gradient-text {
-  background: var(--gradient-primary);
+  background: var(--gradient-neon);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
-/* 按鈕樣式 */
+/* ===== 按鈕設計 ===== */
 .btn {
-  padding: var(--spacing-sm) var(--spacing-lg);
-  border: none;
-  border-radius: var(--radius-md);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  font-size: 0.875rem;
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 24px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
 }
 
+/* 主按鈕 (螢光漸層 + 呼吸陰影) */
 .btn-primary {
-  background: var(--gradient-primary);
-  color: white;
-  box-shadow: var(--shadow-md);
+  background: var(--gradient-neon);
+  color: #000;
+  box-shadow: 0 4px 15px rgba(0, 242, 254, 0.3);
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 242, 254, 0.5);
+  color: #000;
 }
 
+.btn-primary:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* 次要按鈕 (毛玻璃透明) */
 .btn-secondary {
-  background: var(--color-bg-secondary);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--color-text-primary);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-glass);
+  backdrop-filter: blur(8px);
 }
 
 .btn-secondary:hover {
-  background: var(--color-bg-tertiary);
-}
-
-.btn-danger {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
-}
-
-.btn-danger:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
 }
 
-/* 卡片樣式 */
-.card {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  transition: all var(--transition-normal);
-}
-
-.card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-xl);
-  border-color: var(--color-primary);
-}
-
-/* 輸入框樣式 */
-.input {
-  width: 100%;
-  padding: var(--spacing-md);
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text-primary);
-  font-size: 1rem;
-  transition: all var(--transition-normal);
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-.input::placeholder {
-  color: var(--color-text-muted);
-}
-
-/* 載入動畫 */
+/* ===== 動態動畫 (Animations) ===== */
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes glow-pulse {
+  0% { box-shadow: 0 0 10px rgba(0, 242, 254, 0.2); }
+  50% { box-shadow: 0 0 25px rgba(0, 242, 254, 0.6); }
+  100% { box-shadow: 0 0 10px rgba(0, 242, 254, 0.2); }
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .loading {
-  animation: spin 1s linear infinite;
-}
-
-/* 淡入動畫 */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  animation: spin 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
 }
 
 .fade-in {
-  animation: fadeIn var(--transition-normal) ease-out;
+  animation: fadeIn 0.4s ease-out forwards;
 }
 
-/* 響應式設計 */
-@media (max-width: 768px) {
-  .container {
-    padding: 0 var(--spacing-md);
-  }
+.slide-up {
+  animation: slideInUp 0.5s var(--transition-bounce) forwards;
+}
+
+/* 通用狀態排版 */
+.loading-container, .empty-state, .error-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 400px;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.empty-state svg {
+  width: 64px;
+  height: 64px;
+  color: var(--color-border-glass);
+  margin-bottom: var(--spacing-md);
+  filter: drop-shadow(0 0 10px rgba(255,255,255,0.1));
+}
+
+.empty-state h3 {
+  font-size: 1.5rem;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.empty-state p {
+  color: var(--color-text-muted);
 }

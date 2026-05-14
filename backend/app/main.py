@@ -5,6 +5,10 @@ FUYU 文件搜尋系統的後端 API
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api import documents, search, ocr
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from fastapi import HTTPException
 
 # 建立 FastAPI 應用程式
 app = FastAPI(
@@ -28,27 +32,33 @@ app.include_router(search.router)
 app.include_router(ocr.router)
 
 
-@app.get("/")
-async def root():
-    """
-    API 根路徑
-    """
-    return {
-        "message": "歡迎使用 FUYU 文件搜尋系統 API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "endpoints": {
-            "search": "/api/search?q=關鍵字",
-            "list_documents": "/api/documents",
-            "get_document": "/api/documents/{doc_id}",
-            "delete_document": "/api/documents/{doc_id}"
-        }
-    }
-
-
 @app.get("/health")
 async def health_check():
-    """
-    健康檢查端點
-    """
+    """健康檢查端點"""
     return {"status": "healthy"}
+
+# 取得 frontend/dist 的絕對路徑
+frontend_dist = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend", "dist")
+
+if os.path.exists(frontend_dist):
+    # 掛載靜態資源 (JS, CSS, 圖片等)
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+    
+    # 攔截所有其他路由，交由 Vue 處理 (SPA)
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # 排除 API 請求，避免 API 404 時回傳 HTML
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="API endpoint not found")
+            
+        file_path = os.path.join(frontend_dist, full_path)
+        # 如果請求的是特定存在的檔案 (例如 favicon.ico)
+        if os.path.isfile(file_path) and not os.path.isdir(file_path):
+            return FileResponse(file_path)
+            
+        # 否則一律回傳 index.html
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+else:
+    @app.get("/")
+    async def root():
+        return {"message": "歡迎使用 FUYU API (前端尚未打包，請在 frontend 目錄執行 npm run build)"}

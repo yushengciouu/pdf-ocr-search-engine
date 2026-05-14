@@ -1,73 +1,93 @@
 <template>
-  <div class="document-item fade-in" @click="$emit('toggle-select')">
+  <div class="document-item glass-panel fade-in" :class="{ 'is-selected': selected }" @click="$emit('toggle-select')">
+    
+    <!-- 發光邊框特效 (hover 時展開) -->
+    <div class="glow-border"></div>
+
     <div class="document-content">
+      <!-- 選擇框區域 -->
       <div v-if="selected !== undefined" class="document-checkbox" @click.stop="$emit('toggle-select')">
-        <input type="checkbox" :checked="selected" readonly />
+        <div class="custom-checkbox" :class="{ 'checked': selected }">
+          <svg v-if="selected" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+          </svg>
+        </div>
       </div>
+
+      <!-- 文件圖示 (霓虹感) -->
       <div class="document-icon">
+        <div class="icon-glow"></div>
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       </div>
 
+      <!-- 資訊區域 -->
       <div class="document-info">
-        <h3 class="document-title">{{ document.filename }}</h3>
+        <h3 class="document-title" :title="document.filename">{{ document.filename }}</h3>
+        
         <div class="document-meta">
-          <!-- 多頁模式：顯示共幾頁命中 -->
-          <span v-if="isGrouped" class="meta-item page-badge">
+          <!-- 多頁模式 -->
+          <span v-if="isGrouped" class="meta-item glass-pill badge-primary">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="14" height="14">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             {{ document.pages.length }} 頁命中
           </span>
           <!-- 單頁模式 -->
-          <span v-else-if="document.page_number" class="meta-item page-badge">
+          <span v-else-if="document.page_number" class="meta-item glass-pill badge-primary">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="14" height="14">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
             第 {{ document.page_number }} 頁
           </span>
-          <span v-if="document.doc_date" class="meta-item doc-date-badge">
+          
+          <!-- 文件日期 -->
+          <span v-if="document.doc_date" class="meta-item glass-pill">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="14" height="14">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             {{ document.doc_date }}
           </span>
-          <span class="meta-item">
+          
+          <!-- 上傳日期 -->
+          <span class="meta-item glass-pill">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="14" height="14">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             {{ formatDate(document.upload_date) }}
           </span>
         </div>
 
-        <!-- 多頁模式：每頁一個 snippet 區塊 -->
-        <div v-if="isGrouped" class="pages-list">
-          <div
-            v-for="page in document.pages"
-            :key="page.page_number"
-            class="page-entry"
-          >
-            <span class="page-label">第 {{ page.page_number }} 頁</span>
-            <div v-if="page.snippet" class="document-snippet">
-              <p v-html="page.snippet"></p>
+        <!-- 內容片段 Snippets -->
+        <div class="snippets-container">
+          <!-- 多頁模式：每頁一個 snippet 區塊 -->
+          <template v-if="isGrouped">
+            <div v-for="page in document.pages" :key="page.page_number" class="snippet-box">
+              <div class="page-indicator">
+                <span>P.{{ page.page_number }}</span>
+              </div>
+              <p class="snippet-text" v-html="page.snippet"></p>
             </div>
-          </div>
-        </div>
+          </template>
 
-        <!-- 單頁模式 -->
-        <div v-else-if="document.snippet" class="document-snippet">
-          <p v-html="document.snippet"></p>
+          <!-- 單頁模式 -->
+          <template v-else-if="document.snippet">
+            <div class="snippet-box">
+              <p class="snippet-text" v-html="document.snippet"></p>
+            </div>
+          </template>
         </div>
       </div>
 
-      <!-- PDF 檢視按鈕 -->
+      <!-- 操作按鈕 -->
       <div class="document-actions">
-        <button class="btn-view-pdf" @click="openPdf" title="在新視窗開啟 PDF">
+        <button class="btn-view-pdf" @click.stop="openPdf" title="在新視窗開啟 PDF">
+          <span class="btn-blur-bg"></span>
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
           </svg>
-          <span>檢視 PDF</span>
+          <span class="btn-text">檢視</span>
         </button>
       </div>
     </div>
@@ -122,12 +142,14 @@ export default {
   <title>${filename}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #525659; overflow: hidden; }
-    embed { display: block; width: 100%; height: 100%; }
+    html, body { width: 100%; height: 100%; background: #111827; overflow: hidden; }
+    embed { display: block; width: 100%; height: 100%; border: none; }
+    .loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #00f2fe; font-family: sans-serif; }
   </style>
 </head>
 <body>
-  <embed src="${pdfUrl}" type="application/pdf" width="100%" height="100%" />
+  <div class="loader">Loading PDF...</div>
+  <embed src="${pdfUrl}" type="application/pdf" width="100%" height="100%" style="position: relative; z-index: 2;" onload="document.querySelector('.loader').style.display='none'" />
 </body>
 </html>`)
       win.document.close()
@@ -138,190 +160,270 @@ export default {
 
 <style scoped>
 .document-item {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-md);
-  transition: all var(--transition-normal);
   position: relative;
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-md);
+  cursor: pointer;
+  transition: all var(--transition-smooth);
   overflow: hidden;
 }
 
-.document-item::before {
-  content: '';
+/* 核心特效：光暈邊框 */
+.glow-border {
   position: absolute;
   top: 0;
   left: 0;
-  width: 3px;
-  height: 100%;
-  background: var(--gradient-primary);
-  transform: scaleY(0);
-  transition: transform var(--transition-normal);
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  background: var(--gradient-neon) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity var(--transition-smooth);
+  pointer-events: none;
 }
 
-.document-item:hover {
-  border-color: var(--color-primary);
-  transform: translateX(4px);
+.document-item:hover, .document-item.is-selected {
+  transform: translateY(-3px) scale(1.005);
+  background: rgba(31, 41, 55, 0.85); /* 稍微變亮 */
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5), 0 0 20px -5px rgba(0, 242, 254, 0.15);
 }
 
-.document-item:hover::before {
-  transform: scaleY(1);
+.document-item:hover .glow-border, .document-item.is-selected .glow-border {
+  opacity: 1;
 }
 
 .document-content {
   display: flex;
   gap: var(--spacing-md);
   align-items: flex-start;
-  cursor: pointer;
+  position: relative;
+  z-index: 1;
 }
 
+/* 客製化 Checkbox */
 .document-checkbox {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-top: 8px;
+  padding-top: 10px;
 }
 
-.document-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: var(--color-primary);
+.custom-checkbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid var(--color-border-glass);
+  background: rgba(0,0,0,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: #000;
 }
 
+.custom-checkbox.checked {
+  background: var(--gradient-neon);
+  border-color: transparent;
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
+}
+
+.custom-checkbox svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 霓虹文件圖示 */
 .document-icon {
-  width: 36px;
-  height: 36px;
-  background: var(--gradient-primary);
-  border-radius: var(--radius-sm);
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.1) 0%, rgba(79, 172, 254, 0.05) 100%);
+  border: 1px solid rgba(0, 242, 254, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.document-icon svg {
-  width: 20px;
-  height: 20px;
-  color: white;
+.icon-glow {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: var(--gradient-neon);
+  filter: blur(15px);
+  opacity: 0.15;
+  border-radius: inherit;
+  transition: opacity var(--transition-smooth);
 }
 
+.document-item:hover .icon-glow {
+  opacity: 0.3;
+}
+
+.document-icon svg {
+  width: 24px;
+  height: 24px;
+  color: var(--color-primary);
+  z-index: 1;
+}
+
+/* 內容區塊 */
 .document-info {
   flex: 1;
   min-width: 0;
 }
 
 .document-title {
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-weight: 600;
   color: var(--color-text-primary);
-  margin-bottom: var(--spacing-xs);
+  margin-bottom: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .document-meta {
   display: flex;
-  gap: var(--spacing-md);
+  gap: 10px;
   align-items: center;
   flex-wrap: wrap;
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: 16px;
 }
 
 .meta-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  padding: 4px 10px;
 }
 
-.meta-item svg {
-  flex-shrink: 0;
+.badge-primary {
+  background: rgba(0, 242, 254, 0.1);
+  border-color: rgba(0, 242, 254, 0.2);
+  color: var(--color-primary);
+  font-weight: 600;
 }
 
-.page-badge {
-  background: var(--color-bg-tertiary);
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  color: var(--color-primary-light);
-  font-weight: 500;
-}
-
-/* 多頁列表 */
-.pages-list {
+/* Snippets 高光片段 */
+.snippets-container {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: 12px;
 }
 
-.page-entry {
-  border-left: 2px solid rgba(99, 102, 241, 0.35);
-  padding-left: var(--spacing-sm);
+.snippet-box {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  position: relative;
+  overflow: hidden;
 }
 
-.page-label {
+.snippet-box::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--gradient-neon);
+  opacity: 0.5;
+}
+
+.page-indicator {
   display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-primary-light);
-  background: rgba(99, 102, 241, 0.1);
-  padding: 1px 8px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  background: rgba(192, 132, 252, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  letter-spacing: 0.05em;
 }
 
-.document-snippet {
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--color-bg-primary);
-  border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
+.snippet-text {
+  font-size: 0.85rem;
   line-height: 1.6;
   color: var(--color-text-secondary);
 }
 
-.document-snippet :deep(b) {
-  color: var(--color-primary-light);
+.snippet-text :deep(b) {
+  color: var(--color-primary);
   font-weight: 600;
-  background: rgba(99, 102, 241, 0.1);
-  padding: 2px 4px;
-  border-radius: 2px;
+  background: rgba(0, 242, 254, 0.15);
+  padding: 0 4px;
+  border-radius: 3px;
+  box-shadow: 0 0 5px rgba(0, 242, 254, 0.2);
 }
 
-/* PDF 檢視按鈕 */
+/* 檢視按鈕 */
 .document-actions {
   display: flex;
   align-items: flex-start;
   flex-shrink: 0;
-  padding-top: 2px;
+  padding-top: 6px;
 }
 
 .btn-view-pdf {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  background: rgba(99, 102, 241, 0.12);
-  border: 1px solid rgba(99, 102, 241, 0.35);
-  border-radius: var(--radius-sm);
-  color: var(--color-primary-light);
-  font-size: 0.8125rem;
+  gap: 8px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  color: var(--color-text-primary);
+  font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  white-space: nowrap;
-  transition: all var(--transition-fast);
+  overflow: hidden;
+  transition: all var(--transition-smooth);
+}
+
+.btn-blur-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(4px);
+  z-index: -1;
+  transition: opacity 0.3s;
 }
 
 .btn-view-pdf:hover {
-  background: rgba(99, 102, 241, 0.25);
-  border-color: var(--color-primary);
-  color: #fff;
+  border-color: rgba(0, 242, 254, 0.5);
+  color: var(--color-primary);
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
-.btn-view-pdf:active {
-  transform: translateY(0);
+.btn-view-pdf:hover .btn-blur-bg {
+  background: rgba(0, 242, 254, 0.1);
+}
+
+@media (max-width: 640px) {
+  .document-content {
+    flex-direction: column;
+  }
+  .document-actions {
+    width: 100%;
+    margin-top: 10px;
+  }
+  .btn-view-pdf {
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>
