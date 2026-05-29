@@ -165,6 +165,12 @@
             </div>
             
             <div class="results-actions" v-if="selectedDocs.length > 0">
+              <button @click="clearAllSelections" class="btn btn-secondary" style="margin-right: 8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                取消選取
+              </button>
               <button @click="printSelected" class="btn btn-primary btn-print" :disabled="isPrinting">
                 <svg v-if="!isPrinting" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -200,6 +206,36 @@
         </div>
       </div>
     </main>
+
+    <!-- 底部懸浮選取工具列 (當有勾選任何文件時顯示，無視當前搜尋結果是否為空) -->
+    <div v-if="selectedDocs.length > 0" class="selection-floating-bar">
+      <div class="container selection-bar-content">
+        <div class="selection-info">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20" height="20">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <span>已選取 <strong>{{ selectedDocs.length }}</strong> 份文件</span>
+        </div>
+        <div class="selection-actions">
+          <button @click="clearAllSelections" class="btn btn-secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            取消所有選取
+          </button>
+          <button @click="printSelected" class="btn btn-primary btn-print" :disabled="isPrinting">
+            <svg v-if="!isPrinting" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            <svg v-else class="loading" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" width="18" height="18">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            {{ isPrinting ? '處理列印中...' : '合併列印已選取' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -309,7 +345,6 @@ export default {
     async handleSearch(payload) {
       this.loading = true
       this.error = null
-      this.selectedDocs = [] // 清除前次搜尋的勾選狀態
       
       // 相容舊的字串傳入或新的物件傳入
       let keyword = '';
@@ -344,6 +379,9 @@ export default {
     
     handleClear() {
       this.searchResults = []
+    },
+    
+    clearAllSelections() {
       this.selectedDocs = []
     },
     
@@ -1118,5 +1156,68 @@ export default {
     width: 100%;
     justify-content: space-between;
   }
+}
+
+/* 底部懸浮選取工具列 */
+.selection-floating-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--color-border-glass);
+  box-shadow: 0 -10px 40px -10px rgba(0, 0, 0, 0.7), 0 0 20px -5px rgba(0, 242, 254, 0.1);
+  padding: var(--spacing-md) 0;
+  z-index: 99;
+  animation: slideUpFloating 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpFloating {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.selection-bar-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.selection-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+.selection-info svg {
+  color: var(--color-primary);
+}
+
+.selection-info strong {
+  color: var(--color-primary);
+  font-size: 1.2rem;
+  margin: 0 4px;
+}
+
+.selection-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.selection-actions .btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+}
+
+/* 補償主區域底部邊距，防止內容被懸浮列遮擋 */
+.main {
+  padding-bottom: 120px !important;
 }
 </style>
