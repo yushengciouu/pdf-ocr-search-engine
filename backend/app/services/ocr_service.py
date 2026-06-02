@@ -65,7 +65,10 @@ class OCRService:
                     self.scan_progress["current_file"] = p.name
                     try:
                         self.scan_single_file(filepath)
+                      # 這裡手動擷取任務已被強制中斷異常，使背景掃描也能順利退出
                     except Exception as e:
+                        if "任務已被強制中斷" in str(e):
+                            break
                         print(f"Error scanning {filepath}: {e}")
             finally:
                 self.is_scanning = False
@@ -93,11 +96,23 @@ class OCRService:
         Returns:
             list of dict, 每個 dict 包含 page_number 和 content
         """
+        import datetime
         ocr = self._get_ocr()
         images = convert_from_path(pdf_path)
 
         page_results = []
         for page_num, image in enumerate(images, start=1):
+            # 檢查是否已達預約掃描結束時間，若是則自動中斷
+            if hasattr(self, 'scheduled_end_time') and self.scheduled_end_time:
+                end_time = self.scheduled_end_time
+                if isinstance(end_time, str):
+                    try:
+                        end_time = datetime.datetime.fromisoformat(end_time.replace(" ", "T"))
+                    except Exception:
+                        pass
+                if isinstance(end_time, datetime.datetime) and datetime.datetime.now() >= end_time:
+                    self.cancel_requested = True
+
             if hasattr(self, 'cancel_requested') and self.cancel_requested:
                 raise Exception("任務已被強制中斷")
                 
@@ -120,7 +135,7 @@ class OCRService:
 
         Returns:
             是否存在
-        """
+          """
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
 
@@ -342,3 +357,6 @@ class OCRService:
                 "status": "failed",
                 "message": str(e)
             }
+
+# 建立全域單一實例
+ocr_service = OCRService()

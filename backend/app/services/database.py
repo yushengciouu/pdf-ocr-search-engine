@@ -23,6 +23,16 @@ class DatabaseService:
         # __file__ 在 backend/app/services/database.py
         # parent = backend/app/services
         # parent.parent = backend/app
+        """
+        初始化資料庫服務
+        
+        Args:
+            db_path: 資料庫檔案路徑
+        """
+        # 取得專案根目錄的資料庫路徑
+        # __file__ 在 backend/app/services/database.py
+        # parent = backend/app/services
+        # parent.parent = backend/app
         # parent.parent.parent = backend
         # parent.parent.parent.parent = FUYU (專案根目錄)
         self.db_path = Path(db_path) if db_path else get_database_path()
@@ -52,6 +62,19 @@ class DatabaseService:
             doc_id UNINDEXED,
             page_number UNINDEXED,
             tokenize='trigram'
+        )
+        ''')
+
+        # 3. 建立 scan_schedules 預約排程表
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS scan_schedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            folder_path TEXT NOT NULL,
+            start_time TEXT NOT NULL,          -- ISO 8601 or YYYY-MM-DD HH:MM:SS
+            end_time TEXT NOT NULL,            -- ISO 8601 or YYYY-MM-DD HH:MM:SS
+            status TEXT NOT NULL,              -- 'pending', 'scanning', 'completed', 'stopped', 'failed'
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            message TEXT DEFAULT NULL          -- 日誌或錯誤訊息
         )
         ''')
         conn.commit()
@@ -292,5 +315,85 @@ class DatabaseService:
         except Exception as e:
             conn.rollback()
             raise Exception(f"刪除文件時發生錯誤: {str(e)}")
+        finally:
+            conn.close()
+
+    def create_schedule(self, folder_path: str, start_time: str, end_time: str) -> int:
+        """建立預約掃描排程"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO scan_schedules (folder_path, start_time, end_time, status)
+                VALUES (?, ?, ?, 'pending')
+            ''', (folder_path, start_time, end_time))
+            conn.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"建立排程失敗: {str(e)}")
+        finally:
+            conn.close()
+
+    def list_schedules(self) -> List[Dict]:
+        """列出所有預約排程"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT id, folder_path, start_time, end_time, status, created_at, message
+                FROM scan_schedules
+                ORDER BY created_at DESC
+            ''')
+            rows = cursor.fetchall()
+            schedules = []
+            for r in rows:
+                schedules.append({
+                    "id": r[0],
+                    "folder_path": r[1],
+                    "start_time": r[2],
+                    "end_time": r[3],
+                    "status": r[4],
+                    "created_at": r[5],
+                    "message": r[6]
+                })
+            return schedules
+        except Exception as e:
+            raise Exception(f"取得排程列表失敗: {str(e)}")
+        finally:
+            conn.close()
+
+    def update_schedule_status(self, schedule_id: int, status: str, message: str = None) -> bool:
+        """更新預約排程狀態"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE scan_schedules
+                SET status = ?, message = ?
+                WHERE id = ?
+            ''', (status, message, schedule_id))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"更新排程狀態失敗: {str(e)}")
+        finally:
+            conn.close()
+
+    def delete_schedule(self, schedule_id: int) -> bool:
+        """刪除預約排程"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                DELETE FROM scan_schedules
+                WHERE id = ?
+            ''', (schedule_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"刪除排程失敗: {str(e)}")
         finally:
             conn.close()

@@ -35,8 +35,33 @@
     <!-- 主要內容 -->
     <main class="main">
       <div class="container">
-        <!-- 搜尋欄 -->
-        <SearchBar @search="handleSearch" @clear="handleClear" />
+        <!-- 功能切換分頁 -->
+        <div class="tab-container" style="margin-bottom: 2rem; display: flex; gap: 12px; border-bottom: 1px solid var(--color-border-glass); padding-bottom: 12px;">
+          <button 
+            @click="currentTab = 'search'" 
+            :class="['btn', currentTab === 'search' ? 'btn-primary' : 'btn-secondary']"
+            style="padding: 10px 24px; border-radius: var(--radius-md);"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18" style="margin-right: 4px;">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            全文檢索
+          </button>
+          <button 
+            @click="currentTab = 'scheduler'" 
+            :class="['btn', currentTab === 'scheduler' ? 'btn-primary' : 'btn-secondary']"
+            style="padding: 10px 24px; border-radius: var(--radius-md);"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18" style="margin-right: 4px;">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            預約掃描排程
+          </button>
+        </div>
+
+        <div v-show="currentTab === 'search'">
+          <!-- 搜尋欄 -->
+          <SearchBar @search="handleSearch" @clear="handleClear" />
 
         <!-- 掃描結果通知 -->
         <div v-if="scanResult" class="scan-result" :class="scanResult.type">
@@ -204,6 +229,157 @@
           <h3>請輸入關鍵字搜尋文件</h3>
           <p>或是點擊右上角掃描新資料夾</p>
         </div>
+        </div>
+
+        <!-- 預約排程頁面 -->
+        <div v-if="currentTab === 'scheduler'" class="scheduler-view fade-in">
+          <div class="scheduler-layout">
+            <!-- 左側：新增排程表單 -->
+            <div class="scheduler-card glass-panel" style="padding: 1.5rem; border-radius: var(--radius-md);">
+              <div class="card-header" style="display: flex; align-items: center; gap: 8px; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.75rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24" height="24" style="color: var(--color-primary);">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--color-text-primary); margin: 0;">新增預約掃描任務</h2>
+              </div>
+              <form @submit.prevent="addSchedule" class="schedule-form" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                <!-- 目標資料夾 -->
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 8px;">
+                  <label style="font-size: 0.9rem; font-weight: 500; color: var(--color-text-secondary);">目標資料夾路徑</label>
+                  <div class="input-with-btn" style="display: flex; gap: 8px;">
+                    <input 
+                      type="text" 
+                      v-model="schedulerForm.folderPath" 
+                      placeholder="例如: C:\Users\705\Desktop\BigOne\paddle\FUYU\PDFs" 
+                      required
+                      class="form-control"
+                      style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--color-border-glass); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--color-text-primary); outline: none;"
+                    />
+                    <button type="button" @click="selectSchedulerFolder" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">
+                      選擇資料夾
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 開始時間 -->
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 8px;">
+                  <label style="font-size: 0.9rem; font-weight: 500; color: var(--color-text-secondary);">預約開始時間</label>
+                  <input 
+                    type="datetime-local" 
+                    v-model="schedulerForm.startTime" 
+                    required 
+                    class="form-control"
+                    style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--color-border-glass); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--color-text-primary); outline: none;"
+                  />
+                </div>
+
+                <!-- 結束時間 -->
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 8px;">
+                  <label style="font-size: 0.9rem; font-weight: 500; color: var(--color-text-secondary);">預約結束時間 (時間到自動停止)</label>
+                  <input 
+                    type="datetime-local" 
+                    v-model="schedulerForm.endTime" 
+                    required 
+                    class="form-control"
+                    style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--color-border-glass); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--color-text-primary); outline: none;"
+                  />
+                  <!-- 快捷時間設定 -->
+                  <div class="quick-durations" style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; font-size: 0.8rem; color: var(--color-text-muted);">
+                    <span>快速設定執行時長：</span>
+                    <button type="button" @click="setSchedulerDuration(30)" class="duration-tag">30分鐘</button>
+                    <button type="button" @click="setSchedulerDuration(60)" class="duration-tag">1小時</button>
+                    <button type="button" @click="setSchedulerDuration(120)" class="duration-tag">2小時</button>
+                    <button type="button" @click="setSchedulerDuration(240)" class="duration-tag">4小時</button>
+                  </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18" style="margin-right: 4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  排定預約掃描
+                </button>
+              </form>
+            </div>
+
+            <!-- 右側：排程清單 -->
+            <div class="scheduler-list glass-panel" style="padding: 1.5rem; border-radius: var(--radius-md); overflow: hidden;">
+              <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24" height="24" style="color: var(--color-primary);">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--color-text-primary); margin: 0;">預約掃描排程清單</h2>
+                </div>
+                <button @click="fetchSchedules" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="14" height="14" style="margin-right: 4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89H18v3z" />
+                  </svg>
+                  重新整理
+                </button>
+              </div>
+
+              <!-- 排程清單表格 -->
+              <div class="table-container" style="overflow-x: auto; width: 100%;">
+                <table v-if="schedules.length > 0" class="schedules-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                  <thead>
+                    <tr style="border-bottom: 1px solid var(--color-border-glass);">
+                      <th style="padding: 12px 10px; color: var(--color-text-muted); font-weight: 500;">目標資料夾</th>
+                      <th style="padding: 12px 10px; color: var(--color-text-muted); font-weight: 500;">排程時間</th>
+                      <th style="padding: 12px 10px; color: var(--color-text-muted); font-weight: 500;">狀態</th>
+                      <th style="padding: 12px 10px; color: var(--color-text-muted); font-weight: 500;">說明/記錄</th>
+                      <th style="padding: 12px 10px; color: var(--color-text-muted); font-weight: 500; text-align: right;">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="sched in schedules" :key="sched.id" :class="sched.status" style="border-bottom: 1px solid var(--color-border-glass);">
+                      <td class="folder-path" :title="sched.folder_path" style="padding: 14px 10px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        {{ sched.folder_path }}
+                      </td>
+                      <td class="time-col" style="padding: 14px 10px; font-family: monospace; font-size: 0.8rem; line-height: 1.4;">
+                        <div>始：{{ formatDateTimeDisplay(sched.start_time) }}</div>
+                        <div>止：{{ formatDateTimeDisplay(sched.end_time) }}</div>
+                      </td>
+                      <td style="padding: 14px 10px;">
+                        <span :class="['status-badge', sched.status]">
+                          <span v-if="sched.status === 'scanning'" class="scanning-dot"></span>
+                          {{ getStatusLabel(sched.status) }}
+                        </span>
+                      </td>
+                      <td class="msg-col" :title="sched.message" style="padding: 14px 10px; font-size: 0.8rem; color: var(--color-text-secondary); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        {{ sched.message || '無' }}
+                      </td>
+                      <td class="action-col" style="padding: 14px 10px; text-align: right;">
+                        <button 
+                          v-if="sched.status === 'pending' || sched.status === 'scanning'"
+                          @click="stopSchedule(sched.id)" 
+                          class="btn btn-secondary stop-btn"
+                          style="padding: 4px 10px; font-size: 0.75rem;"
+                        >
+                          {{ sched.status === 'scanning' ? '中止' : '取消' }}
+                        </button>
+                        <button 
+                          v-else
+                          @click="deleteSchedule(sched.id)" 
+                          class="btn btn-secondary delete-btn"
+                          style="padding: 4px 10px; font-size: 0.75rem;"
+                        >
+                          刪除
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-else class="empty-schedules" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 0; color: var(--color-text-muted); gap: 12px;">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="48" height="48">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p>目前尚無預約排程任務</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
 
@@ -271,7 +447,18 @@ export default {
       scanProgress: null,
       scanProgressId: null,
       selectedDocs: [],
-      isPrinting: false
+      isPrinting: false,
+      
+      // 預約排程相關欄位
+      currentTab: 'search',
+      schedulerForm: {
+        folderPath: '',
+        startTime: '',
+        endTime: ''
+      },
+      schedules: [],
+      schedulesLoading: false,
+      schedulesRefreshIntervalId: null
     }
   },
   computed: {
@@ -298,9 +485,14 @@ export default {
   mounted() {
     this.checkProgress()
     this.scanProgressId = setInterval(this.checkProgress, 2000)
+    
+    // 預約排程初始化
+    this.fetchSchedules()
+    this.schedulesRefreshIntervalId = setInterval(this.fetchSchedules, 4000)
   },
   unmounted() {
     if (this.scanProgressId) clearInterval(this.scanProgressId)
+    if (this.schedulesRefreshIntervalId) clearInterval(this.schedulesRefreshIntervalId)
   },
   methods: {
     async fetchDocuments(page = 1) {
@@ -627,6 +819,156 @@ export default {
       const sizes = ['Bytes', 'KB', 'MB', 'GB']
       const i = Math.floor(Math.log(bytes) / Math.log(k))
       return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+    },
+
+    // 預約排程方法
+    async fetchSchedules() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/scheduler/schedules`)
+        const data = await response.json()
+        if (data.success) {
+          this.schedules = data.data
+        }
+      } catch (err) {
+        console.error('Error fetching schedules:', err)
+      }
+    },
+    
+    async selectSchedulerFolder() {
+      try {
+        const pickerResponse = await fetch(`${API_BASE_URL}/api/ocr/select_folder`);
+        const pickerData = await pickerResponse.json();
+        if (pickerData.success && pickerData.folder_path) {
+          this.schedulerForm.folderPath = pickerData.folder_path;
+        }
+      } catch (err) {
+        alert('無法開啟資料夾選擇器: ' + err.message);
+      }
+    },
+    
+    setSchedulerDuration(minutes) {
+      const now = new Date();
+      let baseDate = now;
+      if (this.schedulerForm.startTime) {
+        baseDate = new Date(this.schedulerForm.startTime);
+      } else {
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const mins = String(now.getMinutes()).padStart(2, '0');
+        this.schedulerForm.startTime = `${year}-${month}-${day}T${hours}:${mins}`;
+      }
+      
+      const endDate = new Date(baseDate.getTime() + minutes * 60 * 1000);
+      const year = endDate.getFullYear();
+      const month = String(endDate.getMonth() + 1).padStart(2, '0');
+      const day = String(endDate.getDate()).padStart(2, '0');
+      const hours = String(endDate.getHours()).padStart(2, '0');
+      const mins = String(endDate.getMinutes()).padStart(2, '0');
+      this.schedulerForm.endTime = `${year}-${month}-${day}T${hours}:${mins}`;
+    },
+    
+    async addSchedule() {
+      if (!this.schedulerForm.folderPath) {
+        alert('請填寫或選擇目標資料夾');
+        return;
+      }
+      if (!this.schedulerForm.startTime) {
+        alert('請選擇預約開始時間');
+        return;
+      }
+      if (!this.schedulerForm.endTime) {
+        alert('請選擇預約結束時間');
+        return;
+      }
+      
+      const start = new Date(this.schedulerForm.startTime);
+      const end = new Date(this.schedulerForm.endTime);
+      
+      if (end <= start) {
+        alert('結束時間必須晚於開始時間');
+        return;
+      }
+      
+      try {
+        const formatDateTime = (dtStr) => dtStr.replace('T', ' ') + ':00';
+        
+        const response = await fetch(`${API_BASE_URL}/api/scheduler/schedule`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            folder_path: this.schedulerForm.folderPath,
+            start_time: formatDateTime(this.schedulerForm.startTime),
+            end_time: formatDateTime(this.schedulerForm.endTime)
+          })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          this.schedulerForm.folderPath = '';
+          this.schedulerForm.startTime = '';
+          this.schedulerForm.endTime = '';
+          await this.fetchSchedules();
+          alert('預約掃描已成功排定！');
+        } else {
+          alert('排定失敗: ' + (data.detail || '未知錯誤'));
+        }
+      } catch (err) {
+        alert('送出預約時發生錯誤: ' + err.message);
+      }
+    },
+    
+    async stopSchedule(id) {
+      if (!confirm('確認要終止或取消此預約任務？')) return;
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/scheduler/${id}/stop`, {
+          method: 'POST'
+        });
+        const data = await response.json();
+        if (data.success) {
+          await this.fetchSchedules();
+        } else {
+          alert(data.message || '操作失敗');
+        }
+      } catch (err) {
+        alert('停止排程時發生錯誤: ' + err.message);
+      }
+    },
+    
+    async deleteSchedule(id) {
+      if (!confirm('確認要刪除此預約記錄？')) return;
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/scheduler/${id}`, {
+          method: 'DELETE'
+        });
+        const data = await response.json();
+        if (data.success) {
+          await this.fetchSchedules();
+        } else {
+          alert(data.detail || '刪除失敗');
+        }
+      } catch (err) {
+        alert('刪除排程時發生錯誤: ' + err.message);
+      }
+    },
+    
+    formatDateTimeDisplay(dateStr) {
+      if (!dateStr) return '';
+      return dateStr.replace('T', ' ').substring(0, 16);
+    },
+
+    getStatusLabel(status) {
+      const labels = {
+        'pending': '排程中',
+        'scanning': '掃描中',
+        'completed': '已完成',
+        'stopped': '已停止',
+        'failed': '失敗'
+      };
+      return labels[status] || status;
     }
   }
 }
@@ -1219,5 +1561,116 @@ export default {
 /* 補償主區域底部邊距，防止內容被懸浮列遮擋 */
 .main {
   padding-bottom: 120px !important;
+}
+
+/* ===== 預約排程樣式 (Cyber-Glassmorphism Scheduler) ===== */
+.scheduler-layout {
+  display: grid;
+  grid-template-columns: 1.2fr 1.8fr;
+  gap: 2rem;
+  align-items: start;
+  margin-top: 1rem;
+}
+
+@media (max-width: 1024px) {
+  .scheduler-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.duration-tag {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border-glass);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all var(--transition-fast);
+}
+
+.duration-tag:hover {
+  background: rgba(0, 242, 254, 0.15);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-badge.pending {
+  background: rgba(0, 242, 254, 0.1);
+  color: var(--color-primary);
+  border: 1px solid rgba(0, 242, 254, 0.2);
+}
+
+.status-badge.scanning {
+  background: rgba(192, 132, 252, 0.1);
+  color: var(--color-accent);
+  border: 1px solid rgba(192, 132, 252, 0.2);
+  animation: glow-pulse 2s infinite;
+}
+
+.status-badge.completed {
+  background: rgba(52, 211, 153, 0.1);
+  color: var(--color-success);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.status-badge.stopped {
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--color-warning);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.status-badge.failed {
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--color-danger);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.scanning-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  display: inline-block;
+  animation: spin 1.5s linear infinite;
+  box-shadow: 0 0 6px var(--color-accent);
+}
+
+.schedules-table tr.scanning {
+  background: rgba(192, 132, 252, 0.03);
+}
+
+.stop-btn {
+  background: rgba(248, 113, 113, 0.15) !important;
+  color: #f87171 !important;
+  border: 1px solid rgba(248, 113, 113, 0.25) !important;
+}
+
+.stop-btn:hover {
+  background: #f87171 !important;
+  color: #000 !important;
+  border-color: #f87171 !important;
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.3);
+}
+
+.delete-btn {
+  color: var(--color-text-muted) !important;
+}
+
+.delete-btn:hover {
+  background: rgba(248, 113, 113, 0.15) !important;
+  color: #f87171 !important;
+  border-color: rgba(248, 113, 113, 0.25) !important;
 }
 </style>

@@ -2,13 +2,13 @@
 FastAPI 主程式
 FUYU 文件搜尋系統的後端 API
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from .api import documents, search, ocr
-import os
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from fastapi import HTTPException
+import os
+
+from .api import documents, search, ocr, scheduler
 
 # 建立 FastAPI 應用程式
 app = FastAPI(
@@ -30,12 +30,23 @@ app.add_middleware(
 app.include_router(documents.router)
 app.include_router(search.router)
 app.include_router(ocr.router)
+app.include_router(scheduler.router)
 
 
 @app.get("/health")
 async def health_check():
     """健康檢查端點"""
     return {"status": "healthy"}
+
+@app.on_event("startup")
+def startup_event():
+    from .services.scheduler_service import scheduler_service
+    scheduler_service.start()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    from .services.scheduler_service import scheduler_service
+    scheduler_service.stop()
 
 # 取得 frontend/dist 的絕對路徑
 frontend_dist = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend", "dist")

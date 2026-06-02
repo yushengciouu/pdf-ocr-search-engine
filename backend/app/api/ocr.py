@@ -6,10 +6,9 @@ import subprocess
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List
-from ..services.ocr_service import OCRService
+from ..services.ocr_service import ocr_service
 
 router = APIRouter(prefix="/api/ocr", tags=["ocr"])
-ocr_service = OCRService()
 
 class ScanFileRequest(BaseModel):
     filepath: str
