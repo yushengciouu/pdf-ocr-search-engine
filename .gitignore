@@ -41,6 +41,8 @@ Thumbs.db
 # Database files
 fuyu.db
 fuyu.sqlite
+*.sqlite-shm
+*.sqlite-wal
 
 # Project specific folders
 PDFs/
