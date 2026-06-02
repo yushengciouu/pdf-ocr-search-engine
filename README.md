@@ -1,4 +1,4 @@
-# FUYU 智慧文件搜尋系統 (Intelligent Document Search System)
+# 智慧文件搜尋系統 (Intelligent Document Search System)
 
 FUYU 是一個現代化的全端文件管理與搜尋解決方案，專為高效處理與檢索 PDF 文件而設計。它結合了強大的 **OCR (光學字元辨識)** 技術與 **FTS (全文檢索)** 引擎，讓使用者能夠輕鬆將紙本掃描檔轉化為可搜尋的數位資產。
 
@@ -116,4 +116,4 @@ npm run dev
 
 ---
 
-© 2024 FUYU Project. All Rights Reserved.
+
