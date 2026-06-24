@@ -126,6 +126,91 @@ class OCRService:
 
         return page_results
 
+    def extract_docx(self, docx_path: str) -> List[Dict]:
+        """
+        提取 Word (.docx) 文件的文字內容，整份文件做為第 1 頁寫入。
+        """
+        import docx
+        import datetime
+
+        # 檢查超時與中斷
+        if hasattr(self, 'scheduled_end_time') and self.scheduled_end_time:
+            end_time = self.scheduled_end_time
+            if isinstance(end_time, str):
+                try:
+                    end_time = datetime.datetime.fromisoformat(end_time.replace(" ", "T"))
+                except Exception:
+                    pass
+            if isinstance(end_time, datetime.datetime) and datetime.datetime.now() >= end_time:
+                self.cancel_requested = True
+
+        if hasattr(self, 'cancel_requested') and self.cancel_requested:
+            raise Exception("任務已被強制中斷")
+
+        doc = docx.Document(docx_path)
+        
+        paragraphs = []
+        # 1. 取得段落文字
+        for p in doc.paragraphs:
+            text = p.text.strip()
+            if text:
+                paragraphs.append(text)
+                
+        # 2. 取得表格文字
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                if row_text:
+                    # 去重相鄰重複儲存格 (因為合併儲存格會重複讀取)
+                    unique_row_text = []
+                    for cell_t in row_text:
+                        if not unique_row_text or cell_t != unique_row_text[-1]:
+                            unique_row_text.append(cell_t)
+                    paragraphs.append(" | ".join(unique_row_text))
+                    
+        full_text = "\n".join(paragraphs)
+        return [{"page_number": 1, "content": full_text}]
+
+    def extract_xlsx(self, xlsx_path: str) -> List[Dict]:
+        """
+        提取 Excel (.xlsx) 文件的文字內容，所有 Sheets 的內容合併做為第 1 頁寫入。
+        """
+        import openpyxl
+        import datetime
+
+        # 檢查超時與中斷
+        if hasattr(self, 'scheduled_end_time') and self.scheduled_end_time:
+            end_time = self.scheduled_end_time
+            if isinstance(end_time, str):
+                try:
+                    end_time = datetime.datetime.fromisoformat(end_time.replace(" ", "T"))
+                except Exception:
+                    pass
+            if isinstance(end_time, datetime.datetime) and datetime.datetime.now() >= end_time:
+                self.cancel_requested = True
+
+        if hasattr(self, 'cancel_requested') and self.cancel_requested:
+            raise Exception("任務已被強制中斷")
+
+        wb = openpyxl.load_workbook(xlsx_path, data_only=True, read_only=True)
+        try:
+            sheets_text = []
+            for sheet_name in wb.sheetnames:
+                sheet = wb[sheet_name]
+                sheet_lines = []
+                for row in sheet.iter_rows(values_only=True):
+                    row_text = [str(val).strip() for val in row if val is not None and str(val).strip()]
+                    if row_text:
+                        sheet_lines.append(" ".join(row_text))
+                
+                if sheet_lines:
+                    sheets_text.append(f"--- 工作表: {sheet_name} ---\n" + "\n".join(sheet_lines))
+            
+            full_text = "\n\n".join(sheets_text)
+            return [{"page_number": 1, "content": full_text}]
+        finally:
+            wb.close()
+
     def is_file_in_db(self, filename: str) -> bool:
         """
         檢查檔名是否已存在資料庫
@@ -135,7 +220,7 @@ class OCRService:
 
         Returns:
             是否存在
-          """
+        """
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
 
@@ -154,12 +239,12 @@ class OCRService:
 
     def save_to_db(self, filename: str, filepath: str, page_results: List[Dict]) -> int:
         """
-        將 OCR 結果存入資料庫
+        將 OCR 或文字提取結果存入資料庫
 
         Args:
             filename: 檔案名稱
             filepath: 檔案路徑
-            page_results: OCR 結果列表
+            page_results: 文字提取結果列表
 
         Returns:
             文件 ID
@@ -209,7 +294,7 @@ class OCRService:
 
     def check_new_files(self, folder_path: str = None) -> Dict:
         """
-        檢查指定資料夾中有哪些新的 PDF 檔案需要處理
+        檢查指定資料夾中有哪些新的檔案需要處理 (支援 PDF, Docx, Xlsx)
         (不執行 OCR，只返回檔案資訊)
 
         Returns:
@@ -220,17 +305,21 @@ class OCRService:
         if not target_path.exists() or not target_path.is_dir():
             raise Exception(f"資料夾不存在或無效: {target_path}")
 
-        # 取得所有 PDF 檔案
-        pdf_files = list(target_path.glob("*.pdf"))
+        # 取得所有支援的檔案
+        supported_extensions = {".pdf", ".docx", ".xlsx"}
+        supported_files = [
+            p for p in target_path.iterdir()
+            if p.is_file() and p.suffix.lower() in supported_extensions
+        ]
 
         new_files = []
-        for pdf_path in pdf_files:
-            filename = pdf_path.name
-            filepath = str(pdf_path.absolute())
+        for file_path in supported_files:
+            filename = file_path.name
+            filepath = str(file_path.absolute())
 
             # 檢查是否已在資料庫
             if not self.is_file_in_db(filename):
-                file_size = pdf_path.stat().st_size
+                file_size = file_path.stat().st_size
                 new_files.append(
                     {"filename": filename, "filepath": filepath, "size": file_size}
                 )
@@ -238,13 +327,13 @@ class OCRService:
         return {
             "new_files_count": len(new_files),
             "new_files": new_files,
-            "total_files": len(pdf_files),
+            "total_files": len(supported_files),
         }
 
     def scan_factory_folder(self) -> Dict:
         """
-        掃描 factory 資料夾下的所有 PDF 檔案，
-        若檔名不在資料庫則進行 OCR 並存入資料庫
+        掃描 factory 資料夾下的所有 PDF, Docx, Xlsx 檔案，
+        若檔名不在資料庫則進行處理並存入資料庫
 
         Returns:
             處理結果統計
@@ -252,10 +341,14 @@ class OCRService:
         if not self.factory_path.exists():
             raise Exception(f"資料夾不存在: {self.factory_path}")
 
-        # 取得所有 PDF 檔案
-        pdf_files = list(self.factory_path.glob("*.pdf"))
+        # 取得所有支援的檔案
+        supported_extensions = {".pdf", ".docx", ".xlsx"}
+        supported_files = [
+            p for p in self.factory_path.iterdir()
+            if p.is_file() and p.suffix.lower() in supported_extensions
+        ]
 
-        if not pdf_files:
+        if not supported_files:
             return {
                 "total": 0,
                 "processed": 0,
@@ -269,9 +362,9 @@ class OCRService:
         failed_count = 0
         details = []
 
-        for pdf_path in pdf_files:
-            filename = pdf_path.name
-            filepath = str(pdf_path.absolute())
+        for file_path in supported_files:
+            filename = file_path.name
+            filepath = str(file_path.absolute())
 
             # 檢查是否已在資料庫
             if self.is_file_in_db(filename):
@@ -285,16 +378,28 @@ class OCRService:
                 )
                 continue
 
-            # 進行 OCR
+            # 進行 OCR / 文字提取
             try:
-                page_results = self.ocr_pdf(str(pdf_path))
+                ext = file_path.suffix.lower()
+                if ext == ".pdf":
+                    page_results = self.ocr_pdf(str(file_path))
+                    msg = f"成功處理 {len(page_results)} 頁"
+                elif ext == ".docx":
+                    page_results = self.extract_docx(str(file_path))
+                    msg = "成功提取 Word 內文"
+                elif ext == ".xlsx":
+                    page_results = self.extract_xlsx(str(file_path))
+                    msg = "成功提取 Excel 內文"
+                else:
+                    raise Exception(f"不支援的檔案格式: {ext}")
+
                 doc_id = self.save_to_db(filename, filepath, page_results)
                 processed_count += 1
                 details.append(
                     {
                         "filename": filename,
                         "status": "success",
-                        "message": f"成功處理 {len(page_results)} 頁",
+                        "message": msg,
                         "doc_id": doc_id,
                         "pages": len(page_results),
                     }
@@ -306,7 +411,7 @@ class OCRService:
                 )
 
         return {
-            "total": len(pdf_files),
+            "total": len(supported_files),
             "processed": processed_count,
             "skipped": skipped_count,
             "failed": failed_count,
@@ -315,7 +420,7 @@ class OCRService:
 
     def scan_single_file(self, filepath: str) -> Dict:
         """
-        掃描單一 PDF 檔案
+        掃描單一 PDF, Docx, Xlsx 檔案
         
         Args:
             filepath: 檔案路徑
@@ -323,11 +428,11 @@ class OCRService:
         Returns:
             處理結果
         """
-        pdf_path = Path(filepath)
-        if not pdf_path.exists() or not pdf_path.is_file():
+        file_path = Path(filepath)
+        if not file_path.exists() or not file_path.is_file():
             raise Exception(f"檔案不存在: {filepath}")
             
-        filename = pdf_path.name
+        filename = file_path.name
         
         # 檢查是否已在資料庫
         if self.is_file_in_db(filename):
@@ -338,15 +443,27 @@ class OCRService:
                 "message": "已存在資料庫"
             }
             
-        # 進行 OCR
+        # 進行 OCR / 文字提取
         try:
-            page_results = self.ocr_pdf(str(pdf_path))
+            ext = file_path.suffix.lower()
+            if ext == ".pdf":
+                page_results = self.ocr_pdf(str(file_path))
+                msg = f"成功處理 {len(page_results)} 頁"
+            elif ext == ".docx":
+                page_results = self.extract_docx(str(file_path))
+                msg = "成功提取 Word 內文"
+            elif ext == ".xlsx":
+                page_results = self.extract_xlsx(str(file_path))
+                msg = "成功提取 Excel 內文"
+            else:
+                raise Exception(f"不支援的檔案格式: {ext}")
+
             doc_id = self.save_to_db(filename, filepath, page_results)
             return {
                 "success": True,
                 "filename": filename,
                 "status": "success",
-                "message": f"成功處理 {len(page_results)} 頁",
+                "message": msg,
                 "doc_id": doc_id,
                 "pages": len(page_results)
             }
@@ -360,3 +477,4 @@ class OCRService:
 
 # 建立全域單一實例
 ocr_service = OCRService()
+

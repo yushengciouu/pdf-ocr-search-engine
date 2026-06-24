@@ -82,12 +82,15 @@
 
       <!-- 操作按鈕 -->
       <div class="document-actions">
-        <button class="btn-view-pdf" @click.stop="openPdf" title="在新視窗開啟 PDF">
+        <button class="btn-view-pdf" @click.stop="openPdf" :title="isOfficeDoc ? '下載文件' : '在新視窗開啟 PDF'">
           <span class="btn-blur-bg"></span>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+          <svg v-if="isOfficeDoc" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
           </svg>
-          <span class="btn-text">檢視</span>
+          <span class="btn-text">{{ isOfficeDoc ? '下載' : '檢視' }}</span>
         </button>
       </div>
     </div>
@@ -114,6 +117,11 @@ export default {
   computed: {
     isGrouped() {
       return Array.isArray(this.document.pages)
+    },
+    isOfficeDoc() {
+      const filename = this.document.filename || ''
+      const ext = filename.split('.').pop().toLowerCase()
+      return ext === 'docx' || ext === 'xlsx'
     }
   },
   methods: {
@@ -132,7 +140,14 @@ export default {
       const docId = this.document.doc_id || this.document.id
       if (!docId) return
       // 加上時間戳記強制解快取，解決 Edge 瀏覽器讀取錯誤快取檔案的問題
-      const pdfUrl = `${API_BASE_URL}/api/documents/${docId}/pdf?t=${Date.now()}`
+      const url = `${API_BASE_URL}/api/documents/${docId}/pdf?t=${Date.now()}`
+      
+      if (this.isOfficeDoc) {
+        // Office 檔案直接觸發下載
+        window.open(url, '_blank')
+        return
+      }
+      
       const filename = this.document.filename || 'PDF 文件'
       const win = window.open('', '_blank')
       win.document.write(`<!DOCTYPE html>
@@ -149,7 +164,7 @@ export default {
 </head>
 <body>
   <div class="loader">Loading PDF...</div>
-  <embed src="${pdfUrl}" type="application/pdf" width="100%" height="100%" style="position: relative; z-index: 2;" onload="document.querySelector('.loader').style.display='none'" />
+  <embed src="${url}" type="application/pdf" width="100%" height="100%" style="position: relative; z-index: 2;" onload="document.querySelector('.loader').style.display='none'" />
 </body>
 </html>`)
       win.document.close()

@@ -106,17 +106,21 @@ class SchedulerService:
             if not path.exists() or not path.is_dir():
                 raise Exception(f"目標資料夾不存在或無效: {folder_path}")
 
-            # 獲取所有 PDF
-            pdf_files = list(path.glob("*.pdf"))
-            if not pdf_files:
-                self.db_service.update_schedule_status(sched_id, "completed", "掃描完成：資料夾中沒有 PDF 檔案")
+            # 獲取所有支援的檔案 (PDF, Docx, Xlsx)
+            supported_extensions = {".pdf", ".docx", ".xlsx"}
+            files = [
+                p for p in path.iterdir()
+                if p.is_file() and p.suffix.lower() in supported_extensions
+            ]
+            if not files:
+                self.db_service.update_schedule_status(sched_id, "completed", "掃描完成：資料夾中沒有支援的檔案")
                 return
 
             # 過濾未處理的檔案
             files_to_scan = []
-            for pdf_path in pdf_files:
-                if not ocr_service.is_file_in_db(pdf_path.name):
-                    files_to_scan.append(pdf_path)
+            for file_path in files:
+                if not ocr_service.is_file_in_db(file_path.name):
+                    files_to_scan.append(file_path)
 
             if not files_to_scan:
                 self.db_service.update_schedule_status(sched_id, "completed", "掃描完成：所有檔案均已存在於資料庫中")
@@ -136,7 +140,7 @@ class SchedulerService:
             failed = 0
             timeout_occurred = False
 
-            for i, pdf_path in enumerate(files_to_scan):
+            for i, file_path in enumerate(files_to_scan):
                 # 1. 檢查是否超時
                 if datetime.datetime.now() >= end_time:
                     timeout_occurred = True
@@ -146,15 +150,24 @@ class SchedulerService:
                 if ocr_service.cancel_requested:
                     break
 
-                filename = pdf_path.name
-                filepath = str(pdf_path.absolute())
+                filename = file_path.name
+                filepath = str(file_path.absolute())
 
                 ocr_service.scan_progress["current"] = i + 1
                 ocr_service.scan_progress["current_file"] = filename
 
                 try:
-                    # 執行 OCR 且自動寫入資料庫
-                    page_results = ocr_service.ocr_pdf(filepath)
+                    # 執行 OCR 或文字提取且自動寫入資料庫
+                    ext = file_path.suffix.lower()
+                    if ext == ".pdf":
+                        page_results = ocr_service.ocr_pdf(filepath)
+                    elif ext == ".docx":
+                        page_results = ocr_service.extract_docx(filepath)
+                    elif ext == ".xlsx":
+                        page_results = ocr_service.extract_xlsx(filepath)
+                    else:
+                        raise Exception(f"不支援的檔案格式: {ext}")
+                        
                     ocr_service.save_to_db(filename, filepath, page_results)
                     processed += 1
                 except Exception as e:

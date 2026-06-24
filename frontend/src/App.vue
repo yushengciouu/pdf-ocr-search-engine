@@ -119,7 +119,7 @@
             </div>
             
             <div class="confirm-dialog-content">
-              <p class="file-count">找到 <strong>{{ newFilesInfo.new_files_count }}</strong> 個新的 PDF 檔案需要處理</p>
+              <p class="file-count">找到 <strong>{{ newFilesInfo.new_files_count }}</strong> 個新的文件檔案需要處理</p>
               
               <div class="file-list">
                 <div class="file-list-header">檔案清單：</div>
@@ -694,7 +694,7 @@ export default {
           if (info.new_files_count === 0) {
             this.scanResult = {
               type: 'info',
-              message: info.total_files === 0 ? '資料夾中沒有 PDF 檔案' : '沒有新檔案需要處理',
+              message: info.total_files === 0 ? '資料夾中沒有支援的文件檔案' : '沒有新檔案需要處理',
               details: info
             }
             this.scanning = false

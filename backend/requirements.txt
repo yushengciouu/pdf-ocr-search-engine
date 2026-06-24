@@ -17,3 +17,8 @@ paddlepaddle-gpu==3.0.0  # 需從官方源安裝: pip install paddlepaddle-gpu==
 paddleocr==3.3.2
 pdf2image==1.17.0
 pypdf==5.3.0
+
+# Word & Excel 處理
+python-docx==1.2.0
+openpyxl==3.1.5
+

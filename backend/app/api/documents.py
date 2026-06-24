@@ -83,35 +83,49 @@ async def get_document(doc_id: int):
 @router.get("/{doc_id}/pdf")
 async def get_document_pdf(doc_id: int):
     """
-    取得文件對應的 PDF 檔案
+    取得文件對應的檔案 (支援 PDF 預覽、Word/Excel 下載)
 
     Args:
         doc_id: 文件 ID
 
     Returns:
-        PDF 檔案串流
+        檔案串流 (依副檔名設定 media_type)
     """
     try:
         document = db_service.get_document_by_id(doc_id)
         if not document:
             raise HTTPException(status_code=404, detail="找不到該文件")
 
-        pdf_path = Path(document["filepath"])
+        file_path = Path(document["filepath"])
         
         # 跨平台相容處理：如果絕對路徑 (例如 Windows 路徑在 Docker 內) 找不到檔案，
         # 就嘗試直接從 factory 資料夾尋找該檔名的檔案。
-        if not pdf_path.exists() or not pdf_path.is_file():
+        if not file_path.exists() or not file_path.is_file():
             factory_path = get_factory_path()
-            pdf_path = factory_path / document["filename"]
+            file_path = factory_path / document["filename"]
             
-        if not pdf_path.exists() or not pdf_path.is_file():
-            raise HTTPException(status_code=404, detail="找不到對應的 PDF 檔案")
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(status_code=404, detail="找不到對應的檔案")
+
+        ext = file_path.suffix.lower()
+        if ext == ".pdf":
+            media_type = "application/pdf"
+            disposition = "inline"
+        elif ext == ".docx":
+            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            disposition = "attachment"
+        elif ext == ".xlsx":
+            media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            disposition = "attachment"
+        else:
+            media_type = "application/octet-stream"
+            disposition = "attachment"
 
         return FileResponse(
-            path=str(pdf_path),
-            media_type="application/pdf",
+            path=str(file_path),
+            media_type=media_type,
             headers={
-                "Content-Disposition": f"inline; filename*=UTF-8''{urllib.parse.quote(document['filename'])}"
+                "Content-Disposition": f"{disposition}; filename*=UTF-8''{urllib.parse.quote(document['filename'])}"
             },
         )
     except HTTPException:
