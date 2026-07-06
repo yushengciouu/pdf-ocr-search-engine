@@ -10,7 +10,7 @@ FUYU 是一個現代化的全端文件管理與搜尋解決方案，專為高效
 
 *   **⚡ 全文檢索 (Full-Text Search)**: 使用 SQLite FTS5 引擎，支援高效的關鍵字搜尋 (包含中文 Trigram 分詞)，毫秒級回應。
 *   **🤖 自動化 OCR 處理 (Auto-Ingest)**: 
-    *   自動掃描指定目錄 (`backend/factory`) 的 PDF 文件。
+    *   自動掃描指定目錄的 PDF 文件。
     *   整合 **PaddleOCR** 進行高精準度文字辨識。
     *   智慧增量更新，只處理新增或修改的檔案。
 *   **🖥️ 現代化 Web 介面**:
@@ -49,7 +49,6 @@ FUYU 是一個現代化的全端文件管理與搜尋解決方案，專為高效
 │   │   ├── api/            # API 端點 (Controllers)
 │   │   ├── services/       # 業務邏輯與 OCR 核心
 │   │   └── main.py         # 伺服器入口點
-│   ├── factory/            # [Input] 待處理的 PDF 來源資料夾
 │   ├── fuyu.sqlite         # SQLite 資料庫檔案
 │   └── requirements.txt    # Python 依賴列表
 ├── frontend/               # 前端 Web 應用
