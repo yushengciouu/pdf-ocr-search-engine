@@ -9,8 +9,28 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8000 ^| findstr LISTENING') 
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr :5173 ^| findstr LISTENING') do taskkill /PID %%a /F >nul 2>&1
 timeout /t 2 /nobreak >nul
 
+set "PROJECT_ROOT=%~dp0"
+
+:: 1. 優先使用打包版的 python env
+if exist "%PROJECT_ROOT%fuyu_env\python.exe" (
+    set "PYTHON_EXE=%PROJECT_ROOT%fuyu_env\python.exe"
+) else if exist "C:\Users\705\anaconda3\envs\paddle_env\python.exe" (
+    :: 2. 其次使用開發機預設環境路徑
+    set "PYTHON_EXE=C:\Users\705\anaconda3\envs\paddle_env\python.exe"
+) else (
+    :: 3. 使用系統的 python
+    where python >nul 2>&1
+    if %errorlevel% equ 0 (
+        set "PYTHON_EXE=python"
+    ) else (
+        echo [錯誤] 找不到可用的 Python 環境！
+        pause
+        exit /b 1
+    )
+)
+
 echo [1/1] 啟動 FUYU 核心服務 (Port 8000)...
-start "FUYU 服務" cmd /k "cd /d C:\Users\705\Desktop\BigOne\paddle\FUYU\backend && C:\Users\705\anaconda3\envs\paddle_env\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 || pause"
+start "FUYU 服務" cmd /k "cd /d "%PROJECT_ROOT%backend" && "%PYTHON_EXE%" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 || pause"
 
 echo.
 echo ====================================
@@ -23,3 +43,4 @@ echo.
 echo 請勿關閉彈出的黑色終端機視窗！
 echo.
 pause
+

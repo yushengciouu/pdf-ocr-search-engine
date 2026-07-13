@@ -29,7 +29,7 @@ FUYU 是一個現代化的全端文件管理與搜尋解決方案，專為高效
 *   **Database**: SQLite + FTS5 (輕量級全文檢索，無需額外 DB 服務)
 *   **AI/OCR**: 
     *   [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) (文字辨識)
-    *   `pdf2image` (PDF 轉圖片)
+    *   [PyMuPDF (fitz)](https://github.com/pymupdf/PyMuPDF) (PDF 轉圖片，免除 Poppler 系統依賴)
 *   **Package Manager**: Conda / Pip
 
 ### Frontend (前端)
@@ -67,7 +67,6 @@ FUYU 是一個現代化的全端文件管理與搜尋解決方案，專為高效
 請確保您的系統已安裝：
 - **Python 3.10+** (建議使用 Conda)
 - **Node.js 18+**
-- **Poppler** (用於 pdf2image，Windows 需加入 PATH)
 
 ### 2. 啟動後端 (Backend)
 ```bash
@@ -96,6 +95,55 @@ npm install
 # 預設位址: http://localhost:3000
 npm run dev
 ```
+
+---
+
+## 🌐 部署方式 (Deployment Guides)
+
+本系統支援兩種部署方式：
+
+### 部署方式 A：綠色免安裝包移植
+適合沒有配置 Python / Node.js 環境的目標 Windows 電腦。請參閱 **[PACKAGING_GUIDE.md](./PACKAGING_GUIDE.md)** 進行虛擬環境封裝與移植。
+
+### 部署方式 B：原始碼全新部署 (適合伺服器/開發機)
+適合有配置 Python 與 Node.js 環境的主機，使用 Git 與原始碼直接部署運行：
+
+#### 步驟 1：Clone 專案並進入根目錄
+```bash
+git clone <your-repo-url>
+cd FUYU
+```
+
+#### 步驟 2：編譯並打包前端
+在根目錄下進入 `frontend` 目錄，安裝套件並進行靜態編譯：
+```bash
+cd frontend
+npm install
+npm run build
+```
+*這會生成 `frontend/dist` 目錄。後端服務在啟動時會自動偵測並託管此目錄下的前端 SPA 應用。*
+
+#### 步驟 3：建立後端虛擬環境並安裝依賴
+進入 `backend` 目錄建立 Python 3.10+ 虛擬環境：
+```bash
+cd ../backend
+
+# 建立並啟用您的虛擬環境 (以 Conda 為例)
+conda create -n fuyu_env python=3.10 -y
+conda activate fuyu_env
+
+# 安裝後端所需的所有套件 (已改用 PyMuPDF，免額外安裝 Poppler)
+pip install -r requirements.txt
+```
+> ⚠️ **注意**：如果您需要使用 GPU 進行 OCR 加速，請依提示安裝 PaddlePaddle-GPU 版本：
+> `pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/`
+
+#### 步驟 4：一鍵啟動服務
+回到專案根目錄，雙擊執行 **`一鍵啟動全部.bat`**，或是在虛擬環境啟用狀態下，進入 `backend` 直接執行：
+```bash
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+啟動後即可透過瀏覽器訪問 `http://localhost:8000` 來使用完整的系統（包含前端網頁與後端 API）。
 
 ---
 

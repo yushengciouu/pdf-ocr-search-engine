@@ -12,7 +12,9 @@ import threading
 from pathlib import Path
 from typing import List, Dict
 from paddleocr import PaddleOCR
-from pdf2image import convert_from_path
+import fitz
+import io
+from PIL import Image
 
 from ..paths import get_database_path, get_factory_path
 
@@ -83,7 +85,12 @@ class OCRService:
     def _get_ocr(self):
         """取得 OCR 實例（延遲初始化）"""
         if self.ocr is None:
-            self.ocr = PaddleOCR(use_angle_cls=True, lang="ch", device="gpu")
+            import paddle
+            # 自動偵測是否可以使用 GPU
+            use_gpu = paddle.device.is_compiled_with_cuda() and paddle.device.cuda.device_count() > 0
+            device_str = "gpu" if use_gpu else "cpu"
+            print(f"[OCR] 初始化 PaddleOCR，使用設備: {device_str}")
+            self.ocr = PaddleOCR(use_angle_cls=True, lang="ch", device=device_str)
         return self.ocr
 
     def ocr_pdf(self, pdf_path: str) -> List[Dict]:
@@ -98,7 +105,15 @@ class OCRService:
         """
         import datetime
         ocr = self._get_ocr()
-        images = convert_from_path(pdf_path)
+
+        # 使用 PyMuPDF 將 PDF 各頁轉為 PIL Image，免除 Poppler 系統依賴
+        images = []
+        doc = fitz.open(pdf_path)
+        for page in doc:
+            pix = page.get_pixmap(dpi=150)
+            img_data = pix.tobytes("png")
+            images.append(Image.open(io.BytesIO(img_data)))
+        doc.close()
 
         page_results = []
         for page_num, image in enumerate(images, start=1):

@@ -1,7 +1,9 @@
 import os
 import numpy as np
 from paddleocr import PaddleOCR
-from pdf2image import convert_from_path
+import fitz
+import io
+from PIL import Image
 
 def ocr_pdf(pdf_path: str):
     """
@@ -9,7 +11,16 @@ def ocr_pdf(pdf_path: str):
     返回: list of dict, 每個 dict 包含 page_number 和 content
     """
     ocr = PaddleOCR(use_angle_cls=True, lang="ch")
-    images = convert_from_path(pdf_path)
+    
+    # 使用 PyMuPDF 將 PDF 各頁轉為 PIL Image，免除 Poppler 系統依賴
+    images = []
+    doc = fitz.open(pdf_path)
+    for page in doc:
+        pix = page.get_pixmap(dpi=150)
+        img_data = pix.tobytes("png")
+        images.append(Image.open(io.BytesIO(img_data)))
+    doc.close()
+
     
     page_results = []
     for page_num, image in enumerate(images, start=1):
