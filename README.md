@@ -30,7 +30,7 @@ FUYU 是一個現代化的全端文件管理與搜尋解決方案，專為高效
 *   **AI/OCR**: 
     *   [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) (文字辨識)
     *   [PyMuPDF (fitz)](https://github.com/pymupdf/PyMuPDF) (PDF 轉圖片，免除 Poppler 系統依賴)
-*   **Package Manager**: Conda / Pip
+*   **Package Manager**: uv
 
 ### Frontend (前端)
 *   **Framework**: [Next.js 14](https://nextjs.org/) (React 18)
@@ -65,23 +65,21 @@ FUYU 是一個現代化的全端文件管理與搜尋解決方案，專為高效
 
 ### 1. 環境準備
 請確保您的系統已安裝：
-- **Python 3.10+** (建議使用 Conda)
+- **uv** (Python 套件與環境管理工具，[安裝說明](https://docs.astral.sh/uv/getting-started/installation/))
 - **Node.js 18+**
 
 ### 2. 啟動後端 (Backend)
 ```bash
 cd backend
 
-# 建立/啟用虛擬環境 (建議)
-conda activate paddle_env
+# 1. 建立虛擬環境與安裝依賴 (初次執行)
+uv venv --python 3.10
+uv pip install -r requirements.txt
 
-# 安裝依賴 (初次執行)
-pip install -r requirements.txt
-
-# 啟動 API 伺服器
+# 2. 啟動 API 伺服器 (開發模式帶熱重載)
 # 預設位址: http://localhost:8000
 # Swagger 文件: http://localhost:8000/docs
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
 ### 3. 啟動前端 (Frontend)
@@ -123,25 +121,27 @@ npm run build
 ```
 *這會生成 `frontend/dist` 目錄。後端服務在啟動時會自動偵測並託管此目錄下的前端 SPA 應用。*
 
-#### 步驟 3：建立後端虛擬環境並安裝依賴
-進入 `backend` 目錄建立 Python 3.10+ 虛擬環境：
+#### 步驟 3：使用 uv 建立後端虛擬環境並安裝依賴
+進入 `backend` 目錄，使用 `uv` 自動建立 Python 3.10 虛擬環境並安裝套件：
 ```bash
 cd ../backend
 
-# 建立並啟用您的虛擬環境 (以 Conda 為例)
-conda create -n fuyu_env python=3.10 -y
-conda activate fuyu_env
+# 1. 建立專案內置的虛擬環境 (.venv)
+uv venv --python 3.10
 
-# 安裝後端所需的所有套件 (已改用 PyMuPDF，免額外安裝 Poppler)
-pip install -r requirements.txt
+# 2. 一鍵安裝後端所有套件 (已改用 PyMuPDF，免安裝 Poppler，自動從 Paddle 官方源獲取 GPU 版本)
+uv pip install -r requirements.txt
 ```
-> ⚠️ **注意**：如果您需要使用 GPU 進行 OCR 加速，請依提示安裝 PaddlePaddle-GPU 版本：
-> `pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/`
+> 💡 **提示**：系統不需要預先下載安裝 Python，`uv` 會自動下載並配置好指定的 Python 3.10。
+> ⚠️ **注意**：如果您需要進行 GPU 的 OCR 加速，且在安裝過程中沒有成功載入 CUDA 依賴，可於啟用環境後手動安裝對應的 paddlepaddle-gpu 版本。
 
 #### 步驟 4：一鍵啟動服務
-回到專案根目錄，雙擊執行 **`一鍵啟動全部.bat`**，或是在虛擬環境啟用狀態下，進入 `backend` 直接執行：
+回到專案根目錄，雙擊執行 **`一鍵啟動全部.bat`**。
+
+或者，您也可以直接在 `backend` 目錄下使用 `uv run` 啟動服務：
 ```bash
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+cd backend
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 啟動後即可透過瀏覽器訪問 `http://localhost:8000` 來使用完整的系統（包含前端網頁與後端 API）。
 

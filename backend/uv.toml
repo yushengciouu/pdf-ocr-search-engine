@@ -1,0 +1,3 @@
+# uv 專案設定檔
+# 允許 uv 同時從 PyPI 與 PaddleOCR 官方鏡像源比對並下載最適合的版本，避免 fastapi 等依賴套件解析失敗
+index-strategy = "unsafe-best-match"

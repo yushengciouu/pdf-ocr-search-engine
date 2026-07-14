@@ -11,14 +11,17 @@ timeout /t 2 /nobreak >nul
 
 set "PROJECT_ROOT=%~dp0"
 
-:: 1. 優先使用打包版的 python env
-if exist "%PROJECT_ROOT%fuyu_env\python.exe" (
+:: 1. 優先使用 uv/venv 建立的專案內置虛擬環境 (.venv)
+if exist "%PROJECT_ROOT%backend\.venv\Scripts\python.exe" (
+    set "PYTHON_EXE=%PROJECT_ROOT%backend\.venv\Scripts\python.exe"
+) else if exist "%PROJECT_ROOT%fuyu_env\python.exe" (
+    :: 2. 其次使用打包版的 python env
     set "PYTHON_EXE=%PROJECT_ROOT%fuyu_env\python.exe"
 ) else if exist "C:\Users\705\anaconda3\envs\paddle_env\python.exe" (
-    :: 2. 其次使用開發機預設環境路徑
+    :: 3. 再者使用開發機預設環境路徑
     set "PYTHON_EXE=C:\Users\705\anaconda3\envs\paddle_env\python.exe"
 ) else (
-    :: 3. 使用系統的 python
+    :: 4. 最後使用系統的 python
     where python >nul 2>&1
     if %errorlevel% equ 0 (
         set "PYTHON_EXE=python"
