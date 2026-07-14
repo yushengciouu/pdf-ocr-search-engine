@@ -43,7 +43,7 @@ AI 不是讀心者。它之所以會「幻覺」或「寫出爛 Code」，通常
 *   **ORM**: 原生 SQL + Pydantic (這很重要！不要讓 AI 引入 SQLAlchemy 除非必要)
 *   **Frontend Framework**: Next.js (App Router), React
 *   **Styling**: Tailwind CSS
-*   **Package Manager**: `conda` (Python), `npm` (Node)
+*   **Package Manager**: `uv` (Python), `npm` (Node)
 
 ### 2.2 關鍵路徑約定 (Path Conventions)
 *   `backend/app/api/`: 所有 API Routes。

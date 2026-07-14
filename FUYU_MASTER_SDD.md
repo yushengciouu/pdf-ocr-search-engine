@@ -19,7 +19,7 @@
     *   使用原生 SQL + FTS5 (全文檢索)
     *   禁止使用大型 ORM (如 SQLAlchemy)，保持輕量。
 *   **樣式**: Tailwind CSS
-*   **部署**: Docker (Optional), Local Conda Environment (`paddle_env`)
+*   **部署**: Docker (Optional), Local Python Environment (managed by uv)
 
 ### 1.2 專案結構圖
 ```text
@@ -178,8 +178,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS doc_fts USING fts5(
 *   **啟動後端**:
     ```bash
     cd backend
-    conda activate paddle_env
-    uvicorn app.main:app --reload
+    uv run uvicorn app.main:app --reload
     ```
 *   **啟動前端**:
     ```bash

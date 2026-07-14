@@ -6,7 +6,7 @@
 
 ## 📦 打包原理
 1. **前端免 Node.js 依賴**：在開發機預先將 Vue 3 前端編譯為靜態檔案（`frontend/dist`），由 FastAPI 後端直接進行靜態託管。
-2. **免安裝 Python 環境**：使用 `conda-pack` 將現有的 Conda 虛擬環境（包含 PaddleOCR、PyTorch、Poppler 等所有依賴）完整封裝。
+2. **免安裝 Python 環境**：使用 `conda-pack` 將現有的 Conda 虛擬環境（包含 PaddleOCR、PyTorch、PyMuPDF 等所有依賴）完整封裝。
 3. **原生 GUI 支援**：本專案後端直接執行於 Windows 本地環境，能正常彈出原生的 Windows 資料夾選擇視窗。
 
 ---
@@ -51,7 +51,7 @@ New-Item -ItemType Directory -Path "$HOME\Desktop\FUYU_Portable\frontend"
 Copy-Item -Path ".\backend" -Destination "$HOME\Desktop\FUYU_Portable\backend" -Recurse
 Copy-Item -Path ".\frontend\dist" -Destination "$HOME\Desktop\FUYU_Portable\frontend\dist" -Recurse
 
-# 3. 複製封裝好的 Python 虛擬環境 (內含 Poppler 二進位檔)
+# 3. 複製封裝好的 Python 虛擬環境
 Copy-Item -Path ".\fuyu_env" -Destination "$HOME\Desktop\FUYU_Portable\fuyu_env" -Recurse
 
 # 4. 建立一鍵啟動腳本
