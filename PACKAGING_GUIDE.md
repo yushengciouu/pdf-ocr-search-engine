@@ -21,40 +21,47 @@ npm run build
 ```
 *確認 `frontend/` 下多出 `dist/` 資料夾。*
 
-### 2. 打包 Conda 虛擬環境
-開啟 **Anaconda Prompt**，切換到專案根目錄並安裝 `conda-pack` 進行打包：
+### 2. 建立包含 CUDA/cuDNN 的 Conda 虛擬環境並打包
+為了讓綠色包移植到目標電腦（如 RTX 3060 或更高規格）時不需要手動安裝 CUDA 和 cuDNN 驅動程式，必須在打包前將 CUDA/cuDNN 直接裝入 Conda 環境中。
+
+開啟 **Anaconda Prompt**，執行以下指令：
+
 ```cmd
-cd c:\Users\705\Desktop\BigOne\paddle\FUYU
+# 1. 建立全新的乾淨虛擬環境
+conda create -n fuyu_env python=3.10 -y
+conda activate fuyu_env
+
+# 2. 【關鍵】將 CUDA 11.8 與 cuDNN 直接裝在環境內（攜帶 DLL 檔）
+conda install -c conda-forge cudatoolkit=11.8.0 cudnn=8.9.2.26 -y
+
+# 3. 切換到專案的 backend 目錄，安裝所有 Python 依賴與 PaddleOCR GPU 版本
+cd /d c:\Users\705\Desktop\BigOne\paddle\FUYU\backend
+pip install -r requirements.txt
+
+# 4. 安裝打包工具並打包
 pip install conda-pack
-conda pack -n paddle_env -o fuyu_env.zip
+conda pack -n fuyu_env -o ..\fuyu_env.zip
 ```
-*執行完成後，根目錄下會生成一個 `fuyu_env.zip` 檔案。*
+*執行完成後，專案根目錄下會生成一個 `fuyu_env.zip` 檔案。*
 
-### 3. 解壓縮虛擬環境
-在專案根目錄開啟 **PowerShell** 執行解壓指令，解壓到專案目錄的 `fuyu_env`：
-```powershell
-# 建立目錄
-New-Item -ItemType Directory -Path ".\fuyu_env"
-# 解壓縮 zip 檔案
-Expand-Archive -Path ".\fuyu_env.zip" -DestinationPath ".\fuyu_env"
-```
-
-### 4. 整理移植包 (桌面生成)
-在 **PowerShell** 中執行以下腳本，這會自動在您的「桌面」建立 `FUYU_Portable` 移植資料夾，並只複製運行所需的檔案（排除不必要的開發原始碼以進行瘦身）：
+### 3. 整理移植包 (桌面生成)
+在 **PowerShell** 中執行以下腳本，這會自動在您的「桌面」建立 `FUYU_Portable` 移植資料夾，並只複製運行所需的檔案。
+我們直接複製壓縮檔 `fuyu_env.zip`，避免在本機解壓後複製數萬個碎檔案（Windows 複製碎檔案極慢）：
 
 ```powershell
 # 1. 在桌面建立移植資料夾與子目錄
 New-Item -ItemType Directory -Path "$HOME\Desktop\FUYU_Portable"
 New-Item -ItemType Directory -Path "$HOME\Desktop\FUYU_Portable\frontend"
 
-# 2. 複製後端程式碼與前端編譯後的靜態檔案 (排除了 frontend 其他原始碼與 node_modules)
+# 2. 複製後端程式碼與前端編譯後的靜態檔案
+# (備註：這步驟實質上就是將運行所需的專案原目錄搬移過去。但只複製後端程式碼與前端編譯出來的 dist 靜態資料夾，完全排除前端極為龐大的 node_modules 與原始原始碼，以達到顯著的瘦身效果)
 Copy-Item -Path ".\backend" -Destination "$HOME\Desktop\FUYU_Portable\backend" -Recurse
 Copy-Item -Path ".\frontend\dist" -Destination "$HOME\Desktop\FUYU_Portable\frontend\dist" -Recurse
 
-# 3. 複製封裝好的 Python 虛擬環境
-Copy-Item -Path ".\fuyu_env" -Destination "$HOME\Desktop\FUYU_Portable\fuyu_env" -Recurse
+# 3. 複製打包好的環境壓縮檔本身 (不在此處解壓，改由啟動腳本在目標機自動解壓)
+Copy-Item -Path ".\fuyu_env.zip" -Destination "$HOME\Desktop\FUYU_Portable\fuyu_env.zip"
 
-# 4. 建立一鍵啟動腳本
+# 4. 建立智慧一鍵啟動腳本 (自帶自動解壓功能)
 @'
 @echo off
 title FUYU Document Search System
@@ -65,13 +72,21 @@ echo   FUYU System Starting (Portable Version)...
 echo ==================================================
 echo.
 
-:: 1. Check Python Environment
+:: 1. 自動偵測並解壓縮 Python 環境 (僅在第一次啟動時執行)
 if not exist "%~dp0fuyu_env\python.exe" (
-    echo [ERROR] Cannot find python environment at: %~dp0fuyu_env\python.exe
-    echo Please make sure fuyu_env is unzipped correctly.
-    echo.
-    pause
-    exit
+    if exist "%~dp0fuyu_env.zip" (
+        echo [INFO] 偵測到第一次啟動，正在解壓縮 Python 環境...
+        echo 這可能需要 1~2 分鐘，請勿關閉此視窗...
+        powershell -Command "Expand-Archive -Path '%~dp0fuyu_env.zip' -DestinationPath '%~dp0fuyu_env' -Force"
+        echo [INFO] 解壓縮完成！
+        echo.
+    ) else (
+        echo [ERROR] 找不到 Python 執行環境或 fuyu_env.zip！
+        echo 請確認檔案是否完整。
+        echo.
+        pause
+        exit
+    )
 )
 
 :: 2. Start Backend Service
@@ -94,9 +109,11 @@ if errorlevel 1 (
 
 ## 🚀 移植與執行 (目標電腦操作)
 
-1. 將桌面生成的 **`FUYU_Portable`** 資料夾壓縮成 `.zip`。
-2. 將壓縮檔複製並解壓縮至目標電腦。
-3. 雙擊 **`啟動服務.bat`** 即可直接運行。
+1. 將桌面生成的 **`FUYU_Portable`** 資料夾壓縮成 `.zip` 並複製至目標電腦。
+2. 在目標電腦上解壓縮此資料夾。
+3. 雙擊 **`啟動服務.bat`**：
+   * **第一次啟動**：腳本會自動在背景呼叫 PowerShell 將 `fuyu_env.zip` 解壓縮成 `fuyu_env` 資料夾，並自動啟動服務。
+   * **第二次之後**：直接秒開啟動。
 4. 使用瀏覽器訪問 `http://localhost:8000` 開始使用系統。
 
 > 📌 **注意**：系統啟動時，若找不到資料庫 `fuyu.sqlite`，系統會自動在根目錄下初始化建立一個全新的空白資料庫；使用者亦可自行於網頁設定欲監控掃描的 PDF 資料夾路徑。
