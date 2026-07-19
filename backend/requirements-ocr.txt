@@ -1,0 +1,11 @@
+--extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu118/
+
+# GPU 版 PaddlePaddle 與 PaddleOCR
+paddlepaddle-gpu==3.0.0
+paddleocr==3.3.2
+
+# API 核心套件 (用於容器內提供微服務)
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+pillow

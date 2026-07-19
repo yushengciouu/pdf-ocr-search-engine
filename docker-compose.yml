@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  ocr-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.ocr
+    container_name: fuyu-ocr-worker
+    ports:
+      - "5000:5000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped

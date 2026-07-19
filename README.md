@@ -98,15 +98,20 @@ npm run dev
 
 ## 🌐 部署方式 (Deployment Guides)
 
-本系統支援兩種部署方式：
+本系統支援以下兩種部署方式：
 
 ### 部署方式 A：綠色免安裝包移植
 適合沒有配置 Python / Node.js 環境的目標 Windows 電腦。請參閱 **[PACKAGING_GUIDE.md](./PACKAGING_GUIDE.md)** 進行虛擬環境封裝與移植。
 
-### 部署方式 B：原始碼全新部署 (適合伺服器/開發機)
-適合有配置 Python 與 Node.js 環境的主機，使用 Git 與原始碼直接部署運行：
+---
+
+### 部署方式 B：原始碼全新部署 (宿主機控制端 + 容器 OCR 運算端)
+適合擁有 NVIDIA 顯示卡，且希望以最輕量的方式部署並保留原生 Windows 資料夾選擇視窗。
+* **容器端**：使用 Docker 運行自帶 CUDA/cuDNN + PaddlePaddle-GPU 的 OCR 微服務（不需在 Windows 本地配置繁雜的 GPU 驅動與 CUDA）。
+* **宿主機端**：使用 `uv` 構建極其輕量的 Python 環境，執行 FastAPI 主程式與 Windows 原生資料夾選擇器（`tkinter`）。
 
 #### 步驟 1：Clone 專案並進入根目錄
+開啟終端機（CMD 或 PowerShell），複製本專案並進入目錄：
 ```bash
 git clone <your-repo-url>
 cd FUYU
@@ -121,29 +126,28 @@ npm run build
 ```
 *這會生成 `frontend/dist` 目錄。後端服務在啟動時會自動偵測並託管此目錄下的前端 SPA 應用。*
 
-#### 步驟 3：使用 uv 建立後端虛擬環境並安裝依賴
-進入 `backend` 目錄，使用 `uv` 自動建立 Python 3.10 虛擬環境並安裝套件：
+#### 步驟 3：啟動 Docker OCR 容器服務
+確保您的 Windows 已安裝 Docker Desktop 與 NVIDIA Container Toolkit，並在專案根目錄下執行以下指令：
 ```bash
-cd ../backend
-
-# 1. 建立專案內置的虛擬環境 (.venv)
-uv venv --python 3.10
-
-# 2. 一鍵安裝後端所有套件 (已改用 PyMuPDF，免安裝 Poppler，自動從 Paddle 官方源獲取 GPU 版本)
-uv pip install -r requirements.txt
+docker-compose up -d --build
 ```
-> 💡 **提示**：系統不需要預先下載安裝 Python，`uv` 會自動下載並配置好指定的 Python 3.10。
-> ⚠️ **注意**：如果您需要進行 GPU 的 OCR 加速，且在安裝過程中沒有成功載入 CUDA 依賴，可於啟用環境後手動安裝對應的 paddlepaddle-gpu 版本。
+這會自動建置並啟動運行於 `http://localhost:5000` 的 GPU 加速 OCR 微服務。
 
-#### 步驟 4：一鍵啟動服務
-回到專案根目錄，雙擊執行 **`一鍵啟動全部.bat`**。
-
-或者，您也可以直接在 `backend` 目錄下使用 `uv run` 啟動服務：
+#### 步驟 4：使用 uv 建立宿主機輕量化 Python 環境
+在根目錄下進入 `backend` 目錄，使用 `uv` 建立虛擬環境並安裝宿主機依賴：
 ```bash
 cd backend
+uv venv --python 3.10
+uv pip install -r requirements.txt
+```
+*(由於在此部署模式下，宿主機的 `requirements.txt` 已經移除了龐大的 GPU 版 Paddle 套件，此環境的安裝極其迅速且僅佔用數十 MB 的空間)*
+
+#### 步驟 5：啟動宿主機核心服務
+在 `backend` 目錄下啟動後端：
+```bash
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
-啟動後即可透過瀏覽器訪問 `http://localhost:8000` 來使用完整的系統（包含前端網頁與後端 API）。
+啟動後即可透過瀏覽器訪問 `http://localhost:8000` 來使用完整的系統。所有 heavy 的 OCR 辨識會自動傳送給容器內的 Docker Worker 調用 GPU 運算，且能完美保有原生的 Windows 選擇資料夾視窗！
 
 ---
 

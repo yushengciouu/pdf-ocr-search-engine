@@ -11,10 +11,10 @@ import numpy as np
 import threading
 from pathlib import Path
 from typing import List, Dict
-from paddleocr import PaddleOCR
 import fitz
 import io
 from PIL import Image
+import httpx
 
 from ..paths import get_database_path, get_factory_path
 
@@ -82,20 +82,9 @@ class OCRService:
         
         return True
 
-    def _get_ocr(self):
-        """取得 OCR 實例（延遲初始化）"""
-        if self.ocr is None:
-            import paddle
-            # 自動偵測是否可以使用 GPU
-            use_gpu = paddle.device.is_compiled_with_cuda() and paddle.device.cuda.device_count() > 0
-            device_str = "gpu" if use_gpu else "cpu"
-            print(f"[OCR] 初始化 PaddleOCR，使用設備: {device_str}")
-            self.ocr = PaddleOCR(use_angle_cls=True, lang="ch", device=device_str)
-        return self.ocr
-
     def ocr_pdf(self, pdf_path: str) -> List[Dict]:
         """
-        將 PDF 的每一頁分別進行 OCR
+        將 PDF 的每一頁轉為圖片後，發送至容器端 OCR Worker 服務進行辨識
 
         Args:
             pdf_path: PDF 檔案路徑
@@ -104,40 +93,49 @@ class OCRService:
             list of dict, 每個 dict 包含 page_number 和 content
         """
         import datetime
-        ocr = self._get_ocr()
 
-        # 使用 PyMuPDF 將 PDF 各頁轉為 PIL Image，免除 Poppler 系統依賴
-        images = []
+        # 使用 PyMuPDF 將 PDF 各頁轉為 PNG byte 流，免除本機端額外依賴
+        images_data = []
         doc = fitz.open(pdf_path)
         for page in doc:
             pix = page.get_pixmap(dpi=150)
-            img_data = pix.tobytes("png")
-            images.append(Image.open(io.BytesIO(img_data)))
+            images_data.append(pix.tobytes("png"))
         doc.close()
 
         page_results = []
-        for page_num, image in enumerate(images, start=1):
-            # 檢查是否已達預約掃描結束時間，若是則自動中斷
-            if hasattr(self, 'scheduled_end_time') and self.scheduled_end_time:
-                end_time = self.scheduled_end_time
-                if isinstance(end_time, str):
-                    try:
-                        end_time = datetime.datetime.fromisoformat(end_time.replace(" ", "T"))
-                    except Exception:
-                        pass
-                if isinstance(end_time, datetime.datetime) and datetime.datetime.now() >= end_time:
-                    self.cancel_requested = True
+        # 設定超時為 60 秒，以防 OCR 運算在複雜圖片上耗時較長
+        with httpx.Client(timeout=60.0) as client:
+            for page_num, img_bytes in enumerate(images_data, start=1):
+                # 檢查是否已達預約掃描結束時間，若是則自動中斷
+                if hasattr(self, 'scheduled_end_time') and self.scheduled_end_time:
+                    end_time = self.scheduled_end_time
+                    if isinstance(end_time, str):
+                        try:
+                            end_time = datetime.datetime.fromisoformat(end_time.replace(" ", "T"))
+                        except Exception:
+                            pass
+                    if isinstance(end_time, datetime.datetime) and datetime.datetime.now() >= end_time:
+                        self.cancel_requested = True
 
-            if hasattr(self, 'cancel_requested') and self.cancel_requested:
-                raise Exception("任務已被強制中斷")
-                
-            result = ocr.predict(np.array(image))
-            if result and len(result) > 0:
-                page_text = "\n".join(result[0]["rec_texts"])
-            else:
+                if hasattr(self, 'cancel_requested') and self.cancel_requested:
+                    raise Exception("任務已被強制中斷")
+
                 page_text = ""
+                try:
+                    files = {"file": ("page.png", img_bytes, "image/png")}
+                    # 呼叫運行在容器內的 OCR 微服務 (預設埠為 5000)
+                    response = client.post("http://localhost:5000/predict", files=files)
+                    if response.status_code == 200:
+                        res_json = response.json()
+                        page_text = "\n".join(res_json.get("rec_texts", []))
+                    else:
+                        print(f"[OCR] Worker 錯誤 (狀態碼 {response.status_code}): {response.text}")
+                except Exception as e:
+                    print(f"[OCR] 無法連線至 Docker OCR 服務: {e}")
+                    # 在連線失敗時拋出明確異常以提示使用者啟動 Docker
+                    raise Exception(f"無法連線至 Docker OCR 服務，請確認容器已啟動 (錯誤: {e})")
 
-            page_results.append({"page_number": page_num, "content": page_text})
+                page_results.append({"page_number": page_num, "content": page_text})
 
         return page_results
 
