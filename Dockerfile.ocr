@@ -31,12 +31,9 @@ COPY backend/requirements-ocr.txt /app/requirements-ocr.txt
 RUN uv pip install --system --no-cache --index-strategy unsafe-best-match -r requirements-ocr.txt
 
 
-# 在構建期預先下載 PaddleOCR 的中文偵測、識別、方向分類模型
-# 這樣在目標機器啟動時，即使沒有網際網路也能立即進行 OCR 運算
-RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=True, lang='ch', device='cpu')"
-
 # 複製 OCR worker 程式碼到容器
 COPY backend/ocr_worker.py /app/ocr_worker.py
+
 
 EXPOSE 5000
 
