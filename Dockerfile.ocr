@@ -28,7 +28,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/
 
 # 複製並安裝 OCR 容器端所需依賴
 COPY backend/requirements-ocr.txt /app/requirements-ocr.txt
-RUN uv pip install --system --no-cache -r requirements-ocr.txt
+RUN uv pip install --system --no-cache --index-strategy unsafe-best-match -r requirements-ocr.txt
+
 
 # 在構建期預先下載 PaddleOCR 的中文偵測、識別、方向分類模型
 # 這樣在目標機器啟動時，即使沒有網際網路也能立即進行 OCR 運算
